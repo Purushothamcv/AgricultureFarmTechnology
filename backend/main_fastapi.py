@@ -19,29 +19,36 @@ app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Sup
 @app.on_event("startup")
 async def startup_event():
     """Initialize MongoDB connection on application startup"""
+    print("🚀 Starting SmartAgri API...")
     await connect_to_mongodb()
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close MongoDB connection on application shutdown"""
+    print("🛑 Shutting down SmartAgri API...")
     await close_mongodb_connection()
 
 # Configure CORS
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "https://agriculture-farm-technology.vercel.app",  # Your Vercel frontend
+    "https://*.vercel.app"  # Allow all Vercel preview deployments
+]
+
+print(f"🌐 CORS enabled for origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",
-        "https://agriculture-farm-technology.vercel.app",  # Your Vercel frontend
-        "https://*.vercel.app"  # Allow all Vercel preview deployments
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Setup templates
@@ -72,6 +79,26 @@ crop_model = joblib.load("model/crop_model.pkl")
 # ====================
 # Note: Authentication routes (/auth/register, /auth/login) are now handled 
 # by the auth.py module and automatically included via app.include_router(auth_router)
+
+@app.get("/")
+async def root():
+    """Root endpoint - health check"""
+    return {
+        "status": "ok",
+        "message": "SmartAgri API is running",
+        "version": "1.0.0",
+        "database": "connected" if database else "disconnected"
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    db_status = "connected" if database else "disconnected"
+    return {
+        "status": "healthy" if database else "degraded",
+        "database": db_status,
+        "api": "ok"
+    }
 
 @app.get("/api/database/stats")
 async def get_db_stats():

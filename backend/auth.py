@@ -117,10 +117,13 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
         HTTPException: 401 if credentials are invalid
     """
     
+    print(f"🔐 Login attempt for email: {user_credentials.email}")
+    
     # Find user by email
     user = await db.users.find_one({"email": user_credentials.email})
     
     if not user:
+        print(f"❌ Login failed: User not found for email {user_credentials.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password. Please check your credentials."
@@ -128,6 +131,7 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
     
     # Verify password
     if not verify_password(user_credentials.password, user["hashed_password"]):
+        print(f"❌ Login failed: Invalid password for email {user_credentials.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password. Please check your credentials."
@@ -146,6 +150,8 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
         "email": user["email"],
         "role": user.get("role", "user")
     }
+    
+    print(f"✅ Login successful for user: {user_info['email']}")
     
     return LoginResponse(
         message="Login successful",

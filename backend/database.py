@@ -27,8 +27,11 @@ async def connect_to_mongodb():
     """
     global client, database
     
+    print(f"🔄 Connecting to MongoDB...")
+    print(f"📍 MongoDB URL: {MONGODB_URL[:20]}..." if len(MONGODB_URL) > 20 else f"📍 MongoDB URL: {MONGODB_URL}")
+    
     try:
-        client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+        client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=10000)
         database = client[DATABASE_NAME]
         
         # Verify connection
@@ -66,5 +69,15 @@ def get_database():
     """
     Get database instance
     Used for dependency injection in FastAPI routes
+    
+    Raises:
+        HTTPException: If database is not connected
     """
+    if database is None:
+        from fastapi import HTTPException
+        print("❌ Database not connected - cannot process request")
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection not available. Please check MongoDB configuration."
+        )
     return database
