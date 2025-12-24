@@ -1,5 +1,6 @@
-<<<<<<< HEAD
-venv/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
 *.pyc
 *.pyo
 *.pyd
@@ -9,27 +10,76 @@ venv/__pycache__/
 *.egg-info/
 dist/
 build/
+venv/
+env/
+ENV/
 
-# Environment variables (IMPORTANT: Never commit sensitive data)
+# Environment variables
 .env
+.env.local
+.env.*.local
+*.local
 
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+*.tmp
+*.temp
 
 # Logs
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
 
 # Database
 *.db
 *.sqlite3
-=======
-venv/
-.env
->>>>>>> 01c1b19081a3feb846b9ae32bf928b24dedd2301
+
+# Node.js (Frontend)
+node_modules/
+.vercel/
+.cache/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Testing & temp files
+test_*.py
+verify_*.py
+*_test.py
+*.test.js
+
+# Documentation (keep only main README)
+AUTH_DOCUMENTATION.md
+AUTH_README.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_START.md
+WEATHER_FIX_EXPLANATION.md
+
+# Unused app files
+app.py
+app_web.py
+weather_fastapi.py
+weather_simple.html
+setup_auth.py
+
+# Model files (optional - can be large)
+# *.pkl
+# *.h5
+
+# Backup files
+*.bak
+*.backup
+*~
