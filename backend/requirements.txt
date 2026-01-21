@@ -1,0 +1,23 @@
+streamlit
+numpy
+pandas
+matplotlib
+scikit-learn
+joblib
+requests
+folium
+streamlit-folium
+fastapi
+uvicorn
+motor
+pymongo
+passlib[bcrypt]
+python-dotenv
+pydantic[email]
+
+# Fruit Disease Detection Dependencies
+tensorflow>=2.13.0
+keras>=2.13.0
+pillow>=9.5.0
+seaborn>=0.12.0
+python-multipart>=0.0.6

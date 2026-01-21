@@ -1,0 +1,131 @@
+import api from './api';
+
+export const authService = {
+  async login(credentials) {
+    const response = await api.post('/auth/login', credentials);
+    // Store user info (no token in current implementation)
+    if (response.data.user) {
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
+  async register(userData) {
+    const response = await api.post('/auth/register', userData);
+    // Registration successful, but user needs to login
+    return response.data;
+  },
+
+  logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
+
+  getCurrentUser() {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  getToken() {
+    return localStorage.getItem('token');
+  },
+
+  isAuthenticated() {
+    return !!this.getCurrentUser();
+  }
+};
+
+export const weatherService = {
+  async getWeather(lat, lon) {
+    const response = await api.get(`/api/weather?lat=${lat}&lon=${lon}`);
+    return response.data;
+  }
+};
+
+export const cropService = {
+  async recommendCrop(data) {
+    const payload = {
+      nitrogen: parseFloat(data.nitrogen) || 0,
+      phosphorus: parseFloat(data.phosphorus) || 0,
+      potassium: parseFloat(data.potassium) || 0,
+      temperature: parseFloat(data.temperature) || 0,
+      humidity: parseFloat(data.humidity) || 0,
+      ph: parseFloat(data.ph) || 0,
+      rainfall: parseFloat(data.rainfall) || 0,
+      ozone: parseFloat(data.ozone) || 0
+    };
+    const response = await api.post('/predict/manual', payload);
+    return response.data;
+  },
+
+  async recommendCropByLocation(data) {
+    const payload = {
+      latitude: parseFloat(data.latitude),
+      longitude: parseFloat(data.longitude),
+      nitrogen: data.nitrogen ? parseFloat(data.nitrogen) : null,
+      phosphorus: data.phosphorus ? parseFloat(data.phosphorus) : null,
+      potassium: data.potassium ? parseFloat(data.potassium) : null,
+      temperature: data.temperature ? parseFloat(data.temperature) : null,
+      humidity: data.humidity ? parseFloat(data.humidity) : null,
+      ph: data.ph ? parseFloat(data.ph) : null,
+      rainfall: data.rainfall ? parseFloat(data.rainfall) : null,
+      ozone: data.ozone ? parseFloat(data.ozone) : null
+    };
+    const response = await api.post('/predict/location', payload);
+    return response.data;
+  },
+
+  async fetchLocationData(latitude, longitude) {
+    const response = await api.get(`/api/location-data?latitude=${latitude}&longitude=${longitude}`);
+    return response.data;
+  },
+
+  async predictYield(data) {
+    const response = await api.post('/yield/predict', data);
+    return response.data;
+  },
+
+  async predictStress(data) {
+    const response = await api.post('/stress/predict', data);
+    return response.data;
+  },
+
+  async getBestSprayTime(data) {
+    const response = await api.post('/spray/recommend', data);
+    return response.data;
+  }
+};
+
+export const fertilizerService = {
+  async recommendFertilizer(data) {
+    const response = await api.post('/fertilizer/recommend', data);
+    return response.data;
+  }
+};
+
+export const diseaseService = {
+  async classifyFruitDisease(formData) {
+    const response = await api.post('/disease/fruit', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    return response.data;
+  },
+
+  async detectLeafDisease(formData) {
+    const response = await api.post('/disease/leaf', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    return response.data;
+  }
+};
+
+export const chatbotService = {
+  async sendMessage(message) {
+    const response = await api.post('/chatbot/message', { message });
+    return response.data;
+  }
+};

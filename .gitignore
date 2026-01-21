@@ -1,0 +1,94 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+
+# Database
+*.db
+*.sqlite3
+
+# Node.js (Frontend)
+node_modules/
+.vercel/
+.cache/
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.min.css
+
+# Testing & temp files
+test_*.py
+verify_*.py
+*_test.py
+*.test.js
+
+# Documentation (keep only main README)
+AUTH_DOCUMENTATION.md
+AUTH_README.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_START.md
+WEATHER_FIX_EXPLANATION.md
+
+# Unused app files
+app.py
+app_web.py
+weather_fastapi.py
+weather_simple.html
+setup_auth.py
+
+# Model files (optional - can be large)
+*.pkl
+*.h5
+*.hdf5
+*.keras
+
+# Dataset - too large for git
+backend/data/archive/
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# Backup files
+*.bak
+*.backup
+*~
