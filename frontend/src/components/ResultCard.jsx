@@ -54,19 +54,32 @@ const ResultCard = ({ result, type = 'success', title = 'Result', icon: CustomIc
           {typeof result === 'string' ? (
             <p className={`${config.text} text-base`}>{result}</p>
           ) : typeof result === 'object' ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {Object.entries(result).map(([key, value]) => {
+                // Skip fields that are displayed elsewhere or internal flags
+                const skipFields = ['warnings', 'hasWarnings', 'actionRequired', 'interpretation', 'top3'];
+                if (skipFields.includes(key)) {
+                  return null;
+                }
                 // Skip rendering if value is an object or array
                 if (typeof value === 'object' && value !== null) {
                   return null;
                 }
+                
+                // Format the display value
+                let displayValue = value;
+                if (key === 'disease' && typeof value === 'string') {
+                  // Remove underscores and format disease names
+                  displayValue = value.replace(/_/g, ' ');
+                }
+                
                 return (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className={`${config.text} font-medium capitalize`}>
+                  <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                    <span className={`${config.text} font-medium capitalize min-w-[100px]`}>
                       {key.replace(/_/g, ' ')}:
                     </span>
-                    <span className={`${config.text} font-semibold`}>
-                      {typeof value === 'number' ? value.toFixed(2) : value}
+                    <span className={`${config.text} font-semibold flex-1`}>
+                      {typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue}
                     </span>
                   </div>
                 );

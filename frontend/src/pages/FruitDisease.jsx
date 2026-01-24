@@ -41,6 +41,18 @@ const FruitDisease = () => {
         const data = response.data;
         const diseaseInfo = data.disease_info || {};
         
+        // Format action required as user-friendly text
+        const formatActionRequired = (action) => {
+          const actionMap = {
+            'EXPERT_REVIEW_RECOMMENDED': 'Expert review recommended',
+            'FOLLOW_TREATMENT': 'Follow treatment plan',
+            'MONITOR': 'Monitor condition',
+            'IMMEDIATE_ACTION': 'Immediate action required',
+            'NONE': 'No special action required'
+          };
+          return actionMap[action] || action;
+        };
+        
         // Transform to expected format for ResultCard
         setResult({
           disease: data.prediction || 'Unknown',
@@ -51,7 +63,7 @@ const FruitDisease = () => {
           interpretation: data.interpretation || '',
           warnings: data.warnings || [],
           hasWarnings: data.has_warnings || false,
-          actionRequired: data.action_required || 'NONE',
+          actionRequired: formatActionRequired(data.action_required || 'NONE'),
           top3: data.top_3 || []
         });
       } else {
@@ -166,6 +178,13 @@ const FruitDisease = () => {
                       <div className="card mt-4 bg-blue-50 border border-blue-200">
                         <h4 className="text-sm font-semibold text-blue-800 mb-2">📊 Interpretation</h4>
                         <p className="text-xs text-blue-700">{result.interpretation}</p>
+                      </div>
+                    )}
+                    
+                    {result.actionRequired && result.actionRequired !== 'No special action required' && (
+                      <div className="card mt-4 bg-purple-50 border border-purple-200">
+                        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎯 Action Required</h4>
+                        <p className="text-xs text-purple-700 font-medium">{result.actionRequired}</p>
                       </div>
                     )}
                   </>
