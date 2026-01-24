@@ -105,7 +105,8 @@ export const fertilizerService = {
 
 export const diseaseService = {
   async classifyFruitDisease(formData) {
-    const response = await api.post('/disease/fruit', formData, {
+    // CORRECTED: Use V2 endpoint with biologically correct predictions
+    const response = await api.post('/api/v2/fruit-disease/predict', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }
