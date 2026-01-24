@@ -655,14 +655,64 @@ def main():
         raise FileNotFoundError(f"Dataset not found at: {Config.DATASET_PATH}")
     
     # ========================================
+    # CHECKPOINT RESUME LOGIC (PRODUCTION-GRADE)
+    # ========================================
+    checkpoint_path = Config.MODEL_SAVE_PATH
+    history_path = Config.HISTORY_PATH
+    resume_epoch = 0
+    model = None
+    
+    if os.path.exists(checkpoint_path):
+        print("\n" + "="*60)
+        print("CHECKPOINT FOUND - RESUMING TRAINING")
+        print("="*60)
+        print(f"✓ Loading checkpoint from: {checkpoint_path}")
+        
+        # Load existing model
+        model = keras.models.load_model(checkpoint_path)
+        
+        # Determine resume epoch from history file
+        if os.path.exists(history_path):
+            with open(history_path, 'r') as f:
+                history_dict = json.load(f)
+                resume_epoch = len(history_dict['accuracy'])
+                best_val_acc = max(history_dict['val_accuracy'])
+                print(f"✓ Resuming from epoch {resume_epoch}")
+                print(f"✓ Previous best validation accuracy: {best_val_acc:.4f}")
+        else:
+            # No history but model exists - assume fresh start with pretrained weights
+            print("⚠ No history file found")
+            print("✓ Using loaded weights, starting from epoch 0")
+            resume_epoch = 0
+        
+        print("="*60)
+    else:
+        print("\n✓ No checkpoint found - starting fresh training")
+    
+    # ========================================
     # STEP 1: Create data generators WITH CLASS WEIGHTS
     # ========================================
     train_generator, validation_generator, class_weights_dict, labels_map = create_data_generators()
     
     # ========================================
-    # STEP 2: Build model
+    # STEP 2: Build or load model
     # ========================================
-    model = build_model()
+    if model is None:
+        # No checkpoint - build new model
+        model = build_model()
+        print("\n✓ Built new model from scratch")
+    else:
+        # Checkpoint loaded - recompile to ensure training readiness
+        print("\n✓ Using loaded model from checkpoint")
+        print("✓ Recompiling model for resumed training...")
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+            loss='categorical_crossentropy',
+            metrics=['accuracy', 
+                     keras.metrics.Precision(name='precision'),
+                     keras.metrics.Recall(name='recall'),
+                     keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_accuracy')]
+        )
     
     # Print model summary
     print("\n" + "="*60)
@@ -674,48 +724,85 @@ def main():
     callbacks = create_callbacks()
     
     # ========================================
-    # PHASE 1: FEATURE EXTRACTION
+    # PHASE 1: FEATURE EXTRACTION (30 epochs with frozen backbone)
     # ========================================
-    print("\n" + "="*60)
-    print("PHASE 1: FROZEN BASE MODEL (FEATURE EXTRACTION)")
-    print("="*60)
-    print("✓ EfficientNet backbone: FROZEN")
-    print("✓ Training: Classification head only")
-    print("✓ Learning rate: 1e-3")
-    print("✓ Class weights: ENABLED (handles imbalance)")
-    print("✓ Expected behavior: Accuracy should reach 50%+ within 10 epochs")
-    print("="*60)
-    
     initial_epochs = 30
-    history = model.fit(
-        train_generator,
-        validation_data=validation_generator,
-        epochs=initial_epochs,
-        callbacks=callbacks,
-        class_weight=class_weights_dict,  # CRITICAL: Apply class weights
-        verbose=1
-    )
     
-    # Plot training history
-    plot_training_history(history)
-    
-    # Save training history
-    history_dict = {
-        'accuracy': [float(x) for x in history.history['accuracy']],
-        'val_accuracy': [float(x) for x in history.history['val_accuracy']],
-        'loss': [float(x) for x in history.history['loss']],
-        'val_loss': [float(x) for x in history.history['val_loss']]
-    }
-    with open(Config.HISTORY_PATH, 'w') as f:
-        json.dump(history_dict, f, indent=4)
+    if resume_epoch < initial_epochs:
+        print("\n" + "="*60)
+        print("PHASE 1: FROZEN BASE MODEL (FEATURE EXTRACTION)")
+        print("="*60)
+        print("✓ EfficientNet backbone: FROZEN")
+        print("✓ Training: Classification head only (332K params)")
+        print("✓ Optimizer: Adam (learning_rate=1e-3)")
+        print("✓ Class weights: ENABLED (balances 79-1450 samples/class)")
+        print(f"✓ Target epochs: {initial_epochs}")
+        
+        if resume_epoch > 0:
+            print(f"✓ RESUMING from epoch {resume_epoch}")
+        else:
+            print("✓ STARTING fresh training")
+        
+        print("="*60)
+        
+        history = model.fit(
+            train_generator,
+            validation_data=validation_generator,
+            epochs=initial_epochs,
+            initial_epoch=resume_epoch,  # Resume from saved epoch
+            callbacks=callbacks,
+            class_weight=class_weights_dict,  # CRITICAL: Apply class weights
+            verbose=1
+        )
+        
+        # Save/append training history
+        if os.path.exists(Config.HISTORY_PATH) and resume_epoch > 0:
+            # Resuming - append new history to existing
+            with open(Config.HISTORY_PATH, 'r') as f:
+                old_history = json.load(f)
+            history_dict = {
+                'accuracy': old_history['accuracy'] + [float(x) for x in history.history['accuracy']],
+                'val_accuracy': old_history['val_accuracy'] + [float(x) for x in history.history['val_accuracy']],
+                'loss': old_history['loss'] + [float(x) for x in history.history['loss']],
+                'val_loss': old_history['val_loss'] + [float(x) for x in history.history['val_loss']]
+            }
+        else:
+            # Fresh training - create new history
+            history_dict = {
+                'accuracy': [float(x) for x in history.history['accuracy']],
+                'val_accuracy': [float(x) for x in history.history['val_accuracy']],
+                'loss': [float(x) for x in history.history['loss']],
+                'val_loss': [float(x) for x in history.history['val_loss']]
+            }
+        
+        with open(Config.HISTORY_PATH, 'w') as f:
+            json.dump(history_dict, f, indent=4)
+        print(f"\n✓ Training history saved to: {Config.HISTORY_PATH}")
+    else:
+        print("\n" + "="*60)
+        print("✓ Phase 1 already completed - skipping to Phase 2")
+        print("="*60)
     
     # ========================================
-    # PHASE 2: FINE-TUNING
+    # PHASE 2: FINE-TUNING (20 additional epochs, unfrozen layers)
     # ========================================
+    # Determine starting epoch for Phase 2
+    if resume_epoch < initial_epochs:
+        # Just finished Phase 1 - start Phase 2 at epoch 30
+        fine_tune_start_epoch = initial_epochs
+        print("\n✓ Phase 1 completed successfully - starting Phase 2")
+    else:
+        # Already in Phase 2 - resume from saved epoch
+        fine_tune_start_epoch = resume_epoch
+        print(f"\n✓ Resuming Phase 2 from epoch {resume_epoch}")
+    
+    # Execute fine-tuning
     fine_tune_history = fine_tune_model(
-        model, train_generator, validation_generator, 
-        class_weights_dict,  # Pass class weights to fine-tuning
-        len(history.history['accuracy'])
+        model, 
+        train_generator, 
+        validation_generator, 
+        class_weights_dict,
+        fine_tune_start_epoch
     )
     
     # Load best model

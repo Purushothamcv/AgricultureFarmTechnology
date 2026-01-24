@@ -13,6 +13,10 @@ from db_helpers import get_database_stats
 from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse
 from crop_service import predict_crop, fetch_all_location_data
 from fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
+# Import PRODUCTION fruit disease API (frozen model, inference-only)
+from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
+# Import NEW V2 API (clean trained model - 92%+ accuracy)
+from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -22,8 +26,15 @@ async def startup_event():
     """Initialize MongoDB connection and ML models on application startup"""
     print("🚀 Starting SmartAgri API...")
     await connect_to_mongodb()
-    # Initialize fruit disease detection model
+    # Initialize fruit disease detection model (legacy)
     await fruit_startup()
+    # Initialize PRODUCTION fruit disease model (frozen, inference-only)
+    print("🔬 Initializing Production Fruit Disease Detection...")
+    await fruit_prod_startup()
+    # Initialize NEW V2 fruit disease model (clean trained - 92%+)
+    print("🍎 Initializing Fruit Disease V2 (Clean Model)...")
+    await fruit_v2_startup()
+    print("✅ All services initialized")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -59,7 +70,9 @@ templates = Jinja2Templates(directory="templates")
 
 # Include routers
 app.include_router(auth_router)
-app.include_router(fruit_disease_router)
+app.include_router(fruit_disease_router)  # Legacy endpoint
+app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
+app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
