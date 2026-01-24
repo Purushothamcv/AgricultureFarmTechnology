@@ -88,7 +88,7 @@ const FruitDisease = () => {
             <p className="text-gray-600">Upload fruit images to detect diseases</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
             <div className="lg:col-span-2">
               <div className="card">
                 <form onSubmit={handleSubmit}>
@@ -137,7 +137,7 @@ const FruitDisease = () => {
             </div>
 
             <div className="lg:col-span-1">
-              <div className="sticky top-24">
+              <div className="lg:sticky lg:top-24 self-start">
                 {loading ? (
                   <div className="card">
                     <LoadingSpinner text="Analyzing image..." />
