@@ -32,30 +32,26 @@ const LeafDisease = () => {
 
     try {
       const formData = new FormData();
-      formData.append('image', selectedImage);
+      formData.append('file', selectedImage);
 
       const data = await diseaseService.detectLeafDisease(formData);
-      setResult(data);
-    } catch (err) {
-      console.error('Error:', err);
-      // Demo fallback
-      const diseases = [
-        { name: 'Bacterial Blight', confidence: 91.8, crop: 'Rice', severity: 'High' },
-        { name: 'Early Blight', confidence: 88.4, crop: 'Tomato', severity: 'Moderate' },
-        { name: 'Leaf Spot', confidence: 85.7, crop: 'Wheat', severity: 'Moderate' },
-        { name: 'Powdery Mildew', confidence: 82.3, crop: 'Grape', severity: 'Low' },
-        { name: 'Healthy Leaf', confidence: 96.5, crop: 'General', severity: 'None' }
-      ];
-      const randomDisease = diseases[Math.floor(Math.random() * diseases.length)];
+      
+      // Backend now returns cleaned names directly
+      // { crop, disease, confidence, severity, warning, top_3 }
       setResult({
-        disease: randomDisease.name,
-        crop: randomDisease.crop,
-        confidence: `${randomDisease.confidence}%`,
-        severity: randomDisease.severity,
-        treatment: randomDisease.name === 'Healthy Leaf' 
-          ? 'Leaf is healthy. Continue regular care.'
-          : 'Apply fungicide or bactericide. Remove infected leaves. Improve air circulation.'
+        crop: data.crop,
+        disease: data.disease,
+        confidence: `${(data.confidence * 100).toFixed(1)}%`,
+        severity: data.severity,
+        warning: data.warning || null,
+        alternatives: data.top_3 ? data.top_3.slice(1).map(p => ({
+          name: `${p.crop} - ${p.disease}`,
+          confidence: `${(p.confidence * 100).toFixed(1)}%`
+        })) : []
       });
+    } catch (err) {
+      console.error('Error detecting disease:', err);
+      setError('Failed to analyze image. Please ensure the backend server is running on port 8000.');
     }
     setLoading(false);
   };
@@ -118,16 +114,20 @@ const LeafDisease = () => {
               <div className="card mt-6 bg-green-50 border border-green-200">
                 <h3 className="text-lg font-semibold text-green-800 mb-3">Supported Crops</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                  <div>• Tomato</div>
-                  <div>• Potato</div>
-                  <div>• Corn (Maize)</div>
-                  <div>• Rice</div>
-                  <div>• Wheat</div>
-                  <div>• Cotton</div>
-                  <div>• Grape</div>
                   <div>• Apple</div>
-                  <div>• Pepper</div>
+                  <div>• Blueberry</div>
+                  <div>• Cherry</div>
+                  <div>• Corn (Maize)</div>
+                  <div>• Grape</div>
+                  <div>• Orange</div>
+                  <div>• Peach</div>
+                  <div>• Pepper (Bell)</div>
+                  <div>• Potato</div>
+                  <div>• Raspberry</div>
+                  <div>• Soybean</div>
+                  <div>• Squash</div>
                   <div>• Strawberry</div>
+                  <div>• Tomato</div>
                 </div>
               </div>
 

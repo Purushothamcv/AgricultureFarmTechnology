@@ -115,7 +115,7 @@ export const diseaseService = {
   },
 
   async detectLeafDisease(formData) {
-    const response = await api.post('/disease/leaf', formData, {
+    const response = await api.post('/predict/plant-disease', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       }

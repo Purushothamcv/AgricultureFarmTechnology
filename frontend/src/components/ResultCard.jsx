@@ -56,8 +56,11 @@ const ResultCard = ({ result, type = 'success', title = 'Result', icon: CustomIc
           ) : typeof result === 'object' ? (
             <div className="space-y-3">
               {Object.entries(result).map(([key, value]) => {
-                // Skip fields that are displayed elsewhere or internal flags
-                const skipFields = ['warnings', 'hasWarnings', 'actionRequired', 'interpretation', 'top3'];
+                // Skip fields that are internal or should be displayed separately
+                const skipFields = [
+                  'warnings', 'hasWarnings', 'actionRequired', 'interpretation', 
+                  'top3', 'alternatives', 'fullClass', 'class', 'prediction'
+                ];
                 if (skipFields.includes(key)) {
                   return null;
                 }
@@ -66,19 +69,15 @@ const ResultCard = ({ result, type = 'success', title = 'Result', icon: CustomIc
                   return null;
                 }
                 
-                // Format the display value
+                // Format the display value (already clean from backend)
                 let displayValue = value;
-                if (key === 'disease' && typeof value === 'string') {
-                  // Remove underscores and format disease names
-                  displayValue = value.replace(/_/g, ' ');
-                }
                 
                 return (
                   <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className={`${config.text} font-medium capitalize min-w-[100px]`}>
+                    <span className={`${config.text} font-medium capitalize min-w-[100px] flex-shrink-0`}>
                       {key.replace(/_/g, ' ')}:
                     </span>
-                    <span className={`${config.text} font-semibold flex-1`}>
+                    <span className={`${config.text} font-semibold flex-1 break-words`}>
                       {typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue}
                     </span>
                   </div>

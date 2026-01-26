@@ -17,6 +17,8 @@ from fruit_disease_service import router as fruit_disease_router, startup_event 
 from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
 # Import NEW V2 API (clean trained model - 92%+ accuracy)
 from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
+# Import Plant Leaf Disease Detection Service
+from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -34,6 +36,9 @@ async def startup_event():
     # Initialize NEW V2 fruit disease model (clean trained - 92%+)
     print("🍎 Initializing Fruit Disease V2 (Clean Model)...")
     await fruit_v2_startup()
+    # Initialize Plant Leaf Disease Detection
+    print("🌿 Initializing Plant Leaf Disease Detection...")
+    await plant_disease_startup()
     print("✅ All services initialized")
 
 @app.on_event("shutdown")
@@ -73,6 +78,7 @@ app.include_router(auth_router)
 app.include_router(fruit_disease_router)  # Legacy endpoint
 app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
 app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
+app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -100,11 +106,16 @@ crop_model = joblib.load("model/crop_model.pkl")
 @app.get("/")
 async def root():
     """Root endpoint - health check"""
+    try:
+        db_status = "connected" if database and database.client else "disconnected"
+    except:
+        db_status = "unknown"
+    
     return {
         "status": "ok",
         "message": "SmartAgri API is running",
         "version": "1.0.0",
-        "database": "connected" if database else "disconnected"
+        "database": db_status
     }
 
 @app.get("/health")
