@@ -21,3 +21,8 @@ keras>=2.13.0
 pillow>=9.5.0
 seaborn>=0.12.0
 python-multipart>=0.0.6
+
+# AI Chatbot Dependencies
+groq>=0.4.1
+langchain>=0.1.0
+langchain-groq>=0.0.1

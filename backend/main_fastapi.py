@@ -19,6 +19,8 @@ from api_fruit_disease_production import router as fruit_disease_prod_router, st
 from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
 # Import Plant Leaf Disease Detection Service
 from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
+# Import AI Chatbot Service
+from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -39,6 +41,9 @@ async def startup_event():
     # Initialize Plant Leaf Disease Detection
     print("🌿 Initializing Plant Leaf Disease Detection...")
     await plant_disease_startup()
+    # Initialize AI Chatbot Service
+    print("🤖 Initializing AI Chatbot Service...")
+    await chatbot_startup()
     print("✅ All services initialized")
 
 @app.on_event("shutdown")
@@ -76,6 +81,7 @@ templates = Jinja2Templates(directory="templates")
 # Include routers
 app.include_router(auth_router)
 app.include_router(fruit_disease_router)  # Legacy endpoint
+app.include_router(chatbot_router)  # AI Chatbot with voice assistance
 app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
 app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
 app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
