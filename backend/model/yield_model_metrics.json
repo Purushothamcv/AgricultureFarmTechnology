@@ -1,0 +1,8 @@
+{
+  "model_type": "XGBoost",
+  "r2_score": 0.8693796528531426,
+  "rmse": 350.777362876316,
+  "mae": 33.12489039633477,
+  "train_samples": 271388,
+  "test_samples": 67848
+}

@@ -21,6 +21,8 @@ from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_even
 from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
 # Import AI Chatbot Service
 from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
+# Import Yield Prediction Service (APY Dataset-based)
+from yield_prediction_service import get_yield_service, startup_event as yield_startup
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -44,6 +46,8 @@ async def startup_event():
     # Initialize AI Chatbot Service
     print("🤖 Initializing AI Chatbot Service...")
     await chatbot_startup()
+    # Initialize Yield Prediction Service
+    await yield_startup()
     print("✅ All services initialized")
 
 @app.on_event("shutdown")
@@ -95,6 +99,28 @@ class SprayRequest(BaseModel):
     windSpeed: float
     rainfall: float
     timeOfDay: str = ""
+
+# Yield Prediction Request Models
+class YieldPredictionRequest(BaseModel):
+    """Request model for APY-based yield prediction"""
+    state: str
+    district: str
+    crop: str
+    year: int
+    season: str
+    area: float
+
+class LegacyYieldRequest(BaseModel):
+    """Legacy yield prediction request (for backward compatibility)"""
+    crop: str = 'potato'
+    area: float = 1
+    soilMoisture: float = 0.5
+    ozone: float = 40
+    temperature: float = None
+    humidity: float = None
+    rainfall: float = None
+    lat: float = None
+    lon: float = None
 
 # Load ML models
 yield_model = joblib.load("model/yield_model.pkl")
@@ -412,6 +438,120 @@ def api_predict_yield(data: dict):
             "rainfall": rain
         }
     }
+
+
+# ====================
+# NEW: APY-Based Yield Prediction Endpoints
+# ====================
+
+@app.post("/predict-yield")
+async def predict_yield_apy(request: YieldPredictionRequest):
+    """
+    NEW: Predict crop yield using APY dataset-trained model
+    
+    Uses real historical data (State, District, Crop, Year, Season, Area)
+    to predict yield with high accuracy
+    """
+    try:
+        service = get_yield_service()
+        
+        result = service.predict_yield(
+            state=request.state,
+            district=request.district,
+            crop=request.crop,
+            year=request.year,
+            season=request.season,
+            area=request.area
+        )
+        
+        if not result.get('success', False):
+            raise HTTPException(status_code=400, detail=result.get('error', 'Prediction failed'))
+        
+        return result
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+
+@app.get("/api/yield/options")
+async def get_yield_prediction_options():
+    """
+    Get available options for yield prediction dropdowns
+    
+    Returns lists of: States, Districts, Crops, Seasons
+    """
+    try:
+        service = get_yield_service()
+        options = service.get_available_values()
+        
+        return {
+            "success": True,
+            "states": options.get('State', []),
+            "districts": options.get('District', []),
+            "crops": options.get('Crop', []),
+            "seasons": options.get('Season', [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load options: {str(e)}")
+
+
+@app.get("/yield/states")
+async def get_yield_states():
+    """
+    Get list of unique states for yield prediction
+    """
+    try:
+        service = get_yield_service()
+        options = service.get_available_values()
+        
+        return {
+            "success": True,
+            "states": options.get('State', [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load states: {str(e)}")
+
+
+@app.get("/yield/districts/{state}")
+async def get_yield_districts_by_state(state: str):
+    """
+    Get districts filtered by selected state
+    
+    Args:
+        state: State name to filter districts
+    
+    Returns:
+        List of districts in the selected state
+    """
+    try:
+        service = get_yield_service()
+        districts = service.get_districts_by_state(state)
+        
+        return {
+            "success": True,
+            "state": state,
+            "districts": districts
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load districts: {str(e)}")
+
+
+@app.get("/api/yield/model-info")
+async def get_yield_model_info():
+    """Get information about the yield prediction model"""
+    try:
+        service = get_yield_service()
+        info = service.get_model_info()
+        
+        return {
+            "success": True,
+            **info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
+
 
 @app.post("/api/fertilizer/recommend")
 def api_recommend_fertilizer(data: dict):
