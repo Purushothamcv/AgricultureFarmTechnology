@@ -1,0 +1,52 @@
+{
+  "feature_columns": [
+    "Soil_Type_encoded",
+    "Soil_pH",
+    "Soil_Moisture",
+    "Organic_Carbon",
+    "Electrical_Conductivity",
+    "Nitrogen_Level",
+    "Phosphorus_Level",
+    "Potassium_Level",
+    "Temperature",
+    "Humidity",
+    "Rainfall",
+    "Crop_Type_encoded",
+    "Crop_Growth_Stage_encoded",
+    "Season_encoded",
+    "Irrigation_Type_encoded",
+    "Previous_Crop_encoded",
+    "Region_encoded"
+  ],
+  "original_features": [
+    "Soil_Type",
+    "Crop_Type",
+    "Crop_Growth_Stage",
+    "Season",
+    "Irrigation_Type",
+    "Previous_Crop",
+    "Region"
+  ],
+  "numerical_features": [
+    "Soil_pH",
+    "Soil_Moisture",
+    "Organic_Carbon",
+    "Electrical_Conductivity",
+    "Nitrogen_Level",
+    "Phosphorus_Level",
+    "Potassium_Level",
+    "Temperature",
+    "Humidity",
+    "Rainfall"
+  ],
+  "target_column": "Recommended_Fertilizer",
+  "fertilizer_classes": [
+    "Compost",
+    "DAP",
+    "MOP",
+    "NPK",
+    "SSP",
+    "Urea",
+    "Zinc Sulphate"
+  ]
+}
