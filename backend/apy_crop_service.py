@@ -16,7 +16,7 @@ class APYCropService:
         self.csv_path = csv_path
         self.df = None
         self.load_dataset()
-    
+                
     def load_dataset(self):
         """Load and clean APY dataset"""
         try:
