@@ -23,6 +23,8 @@ from plant_disease_service import router as plant_disease_router, startup_event 
 from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
 # Import Yield Prediction Service (APY Dataset-based)
 from yield_prediction_service import get_yield_service, startup_event as yield_startup
+# Import Fertilizer Prediction Service (Dataset-based ML)
+from fertilizer_prediction_service import get_fertilizer_service
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -48,6 +50,10 @@ async def startup_event():
     await chatbot_startup()
     # Initialize Yield Prediction Service
     await yield_startup()
+    # Initialize Fertilizer Prediction Service
+    print("🌱 Initializing Fertilizer Prediction Service...")
+    fertilizer_service = get_fertilizer_service()
+    fertilizer_service.load_model()
     print("✅ All services initialized")
 
 @app.on_event("shutdown")
@@ -555,83 +561,261 @@ async def get_yield_model_info():
 
 @app.post("/api/fertilizer/recommend")
 def api_recommend_fertilizer(data: dict):
-    # Get user inputs
-    N = data.get('N', 0)
-    P = data.get('P', 0)
-    K = data.get('K', 0)
-    crop = data.get('crop', 'potato')
-    soilMoisture = data.get('soilMoisture', 0.5)
+    """
+    ML-based fertilizer recommendation using trained model
     
-    # Weather params - optional, auto-fetch if not provided
-    temp = data.get('temperature')
-    humidity = data.get('humidity')
-    rainfall = data.get('rainfall')
-    
-    # If weather not provided, auto-fetch
-    if temp is None or humidity is None or rainfall is None:
-        lat = data.get('lat', 20.5937)
-        lon = data.get('lon', 78.9629)
+    Required inputs from frontend:
+    - Soil_Type, Soil_pH, Soil_Moisture, Organic_Carbon, Electrical_Conductivity
+    - Nitrogen_Level, Phosphorus_Level, Potassium_Level
+    - Crop_Type, Crop_Growth_Stage, Season
+    - Temperature, Humidity, Rainfall
+    - Irrigation_Type, Previous_Crop, Region
+    """
+    try:
+        fertilizer_service = get_fertilizer_service()
         
-        weather = fetch_weather_data(lat, lon)
-        if weather:
-            temp = weather['temp'] if temp is None else temp
-            humidity = weather['humidity'] if humidity is None else humidity
-            rainfall = weather['rain'] if rainfall is None else rainfall
-        else:
-            temp = temp or 25
-            humidity = humidity or 60
-            rainfall = rainfall or 0
-    
-    # Enhanced fertilizer recommendation logic
-    fertilizers = []
-    recommendations = []
-    
-    # NPK-based recommendations
-    if N < 50:
-        fertilizers.append("Urea (Nitrogen)")
-        recommendations.append(f"Apply 50-100 kg/ha Urea to increase Nitrogen (Current: {N})")
-    elif N > 100:
-        recommendations.append(f"Nitrogen levels are high ({N}). Reduce nitrogen fertilizer use.")
-    
-    if P < 30:
-        fertilizers.append("DAP (Phosphorus)")
-        recommendations.append(f"Apply 40-60 kg/ha DAP to increase Phosphorus (Current: {P})")
-    elif P > 80:
-        recommendations.append(f"Phosphorus levels are sufficient ({P}). Maintain current practices.")
-    
-    if K < 40:
-        fertilizers.append("MOP (Potassium)")
-        recommendations.append(f"Apply 30-50 kg/ha MOP to increase Potassium (Current: {K})")
-    elif K > 100:
-        recommendations.append(f"Potassium levels are high ({K}). No additional potash needed.")
-    
-    # Weather-based adjustments
-    if rainfall > 100:
-        recommendations.append("⚠️ High rainfall: Apply fertilizer in split doses to prevent leaching")
-    if temp > 35:
-        recommendations.append("⚠️ High temperature: Consider foliar application for better absorption")
-    if soilMoisture < 0.3:
-        recommendations.append("⚠️ Low soil moisture: Irrigate before fertilizer application")
-    
-    if not fertilizers:
-        fertilizers.append("Balanced NPK (19-19-19)")
-        recommendations.append("Soil nutrient levels are balanced. Use maintenance dose of NPK.")
-    
-    return {
-        "fertilizer": ", ".join(fertilizers),
-        "recommendations": recommendations,
-        "npk_status": {
-            "nitrogen": N,
-            "phosphorus": P,
-            "potassium": K
-        },
-        "weather_used": {
-            "temperature": temp,
-            "humidity": humidity,
-            "rainfall": rainfall,
-            "soilMoisture": soilMoisture
+        # Extract all required features from request
+        inputs = {
+            'Soil_Type': data.get('Soil_Type'),
+            'Soil_pH': float(data.get('Soil_pH')),
+            'Soil_Moisture': float(data.get('Soil_Moisture')),
+            'Organic_Carbon': float(data.get('Organic_Carbon')),
+            'Electrical_Conductivity': float(data.get('Electrical_Conductivity')),
+            'Nitrogen_Level': float(data.get('Nitrogen_Level')),
+            'Phosphorus_Level': float(data.get('Phosphorus_Level')),
+            'Potassium_Level': float(data.get('Potassium_Level')),
+            'Crop_Type': data.get('Crop_Type'),
+            'Crop_Growth_Stage': data.get('Crop_Growth_Stage'),
+            'Season': data.get('Season'),
+            'Temperature': float(data.get('Temperature')),
+            'Humidity': float(data.get('Humidity')),
+            'Rainfall': float(data.get('Rainfall')),
+            'Irrigation_Type': data.get('Irrigation_Type'),
+            'Previous_Crop': data.get('Previous_Crop'),
+            'Region': data.get('Region')
         }
-    }
+        
+        # Get prediction
+        result = fertilizer_service.predict(inputs)
+        
+        return {
+            "success": True,
+            "fertilizer": result['fertilizer'],
+            "confidence": result['confidence'],
+            "confidence_percentage": result['confidence_percentage'],
+            "top_3_recommendations": result['top_3_recommendations'],
+            "all_probabilities": result['all_probabilities'],
+            "inputs_used": inputs
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+@app.get("/api/fertilizer/options")
+def get_fertilizer_options():
+    """Get all valid options for categorical features"""
+    try:
+        fertilizer_service = get_fertilizer_service()
+        options = fertilizer_service.get_feature_options()
+        return {
+            "success": True,
+            "options": options
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get options: {str(e)}")
+
+
+@app.get("/api/fertilizer/model-info")
+def get_fertilizer_model_info():
+    """Get fertilizer model information and metrics"""
+    try:
+        fertilizer_service = get_fertilizer_service()
+        info = fertilizer_service.get_model_info()
+        return {
+            "success": True,
+            **info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
+
+
+@app.post("/api/fertilizer/location-data")
+def get_fertilizer_location_data(data: dict):
+    """
+    Get location and weather data for fertilizer recommendation based on coordinates
+    Uses reverse geocoding and weather APIs
+    """
+    try:
+        import requests
+        from datetime import datetime
+        
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if latitude is None or longitude is None:
+            raise HTTPException(status_code=400, detail="latitude and longitude are required")
+        
+        # Validate coordinates
+        try:
+            lat = float(latitude)
+            lng = float(longitude)
+            if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                raise ValueError("Invalid coordinates")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid latitude or longitude values")
+        
+        result = {
+            "success": True,
+            "latitude": lat,
+            "longitude": lng,
+            "region": None,
+            "state": None,
+            "district": None,
+            "temperature": None,
+            "humidity": None,
+            "rainfall": 0
+        }
+        
+        # 1. Reverse Geocoding using Nominatim (OpenStreetMap)
+        try:
+            geocode_url = f"https://nominatim.openstreetmap.org/reverse"
+            geocode_params = {
+                'lat': lat,
+                'lon': lng,
+                'format': 'json',
+                'addressdetails': 1
+            }
+            geocode_headers = {
+                'User-Agent': 'SmartAgri-Fertilizer/1.0'
+            }
+            
+            geocode_response = requests.get(
+                geocode_url, 
+                params=geocode_params, 
+                headers=geocode_headers,
+                timeout=5
+            )
+            
+            if geocode_response.status_code == 200:
+                geo_data = geocode_response.json()
+                address = geo_data.get('address', {})
+                
+                # Extract state
+                state = (address.get('state') or 
+                        address.get('ISO3166-2-lvl4', '').split('-')[-1] or 
+                        address.get('region'))
+                
+                # Extract district
+                district = (address.get('state_district') or 
+                           address.get('county') or 
+                           address.get('district'))
+                
+                result['state'] = state
+                result['district'] = district
+                
+                # Map state to region for fertilizer model
+                state_to_region = {
+                    # North (including ISO codes)
+                    'Punjab': 'North', 'PB': 'North',
+                    'Haryana': 'North', 'HR': 'North',
+                    'Himachal Pradesh': 'North', 'HP': 'North',
+                    'Jammu and Kashmir': 'North', 'JK': 'North',
+                    'Delhi': 'North', 'DL': 'North', 'NCT of Delhi': 'North',
+                    'Uttarakhand': 'North', 'UT': 'North', 'UK': 'North',
+                    'Uttar Pradesh': 'North', 'UP': 'North',
+                    'Chandigarh': 'North', 'CH': 'North',
+                    
+                    # South (including ISO codes)
+                    'Tamil Nadu': 'South', 'TN': 'South',
+                    'Karnataka': 'South', 'KA': 'South',
+                    'Kerala': 'South', 'KL': 'South',
+                    'Andhra Pradesh': 'South', 'AP': 'South',
+                    'Telangana': 'South', 'TG': 'South', 'TS': 'South',
+                    'Puducherry': 'South', 'PY': 'South',
+                    
+                    # East (including ISO codes)
+                    'West Bengal': 'East', 'WB': 'East',
+                    'Odisha': 'East', 'OR': 'East', 'OD': 'East',
+                    'Bihar': 'East', 'BR': 'East',
+                    'Jharkhand': 'East', 'JH': 'East',
+                    'Assam': 'East', 'AS': 'East',
+                    'Sikkim': 'East', 'SK': 'East',
+                    'Arunachal Pradesh': 'East', 'AR': 'East',
+                    'Nagaland': 'East', 'NL': 'East',
+                    'Manipur': 'East', 'MN': 'East',
+                    'Mizoram': 'East', 'MZ': 'East',
+                    'Tripura': 'East', 'TR': 'East',
+                    'Meghalaya': 'East', 'ML': 'East',
+                    
+                    # West (including ISO codes)
+                    'Maharashtra': 'West', 'MH': 'West',
+                    'Gujarat': 'West', 'GJ': 'West',
+                    'Goa': 'West', 'GA': 'West',
+                    'Rajasthan': 'West', 'RJ': 'West',
+                    'Daman and Diu': 'West', 'DD': 'West',
+                    
+                    # Central (including ISO codes)
+                    'Madhya Pradesh': 'Central', 'MP': 'Central',
+                    'Chhattisgarh': 'Central', 'CT': 'Central', 'CG': 'Central'
+                }
+                
+                if state:
+                    result['region'] = state_to_region.get(state, 'Central')
+                
+        except requests.Timeout:
+            print("⚠️ Geocoding timeout")
+        except Exception as e:
+            print(f"⚠️ Geocoding error: {e}")
+        
+        # 2. Fetch Weather Data using OpenWeatherMap API (if API key available)
+        try:
+            # Check if OpenWeatherMap API key is available
+            import os
+            weather_api_key = os.getenv('OPENWEATHER_API_KEY', '90e50f067196b6d46932c52869d83ed6')
+            
+            if weather_api_key:
+                weather_url = "https://api.openweathermap.org/data/2.5/weather"
+                weather_params = {
+                    'lat': lat,
+                    'lon': lng,
+                    'appid': weather_api_key,
+                    'units': 'metric'
+                }
+                
+                weather_response = requests.get(
+                    weather_url,
+                    params=weather_params,
+                    timeout=5
+                )
+                
+                if weather_response.status_code == 200:
+                    weather_data = weather_response.json()
+                    
+                    # Extract temperature
+                    result['temperature'] = weather_data.get('main', {}).get('temp')
+                    
+                    # Extract humidity
+                    result['humidity'] = weather_data.get('main', {}).get('humidity')
+                    
+                    # Extract rainfall (if available in last hour)
+                    rain_data = weather_data.get('rain', {})
+                    result['rainfall'] = rain_data.get('1h', 0) or rain_data.get('3h', 0) or 0
+                    
+        except requests.Timeout:
+            print("⚠️ Weather API timeout")
+        except Exception as e:
+            print(f"⚠️ Weather API error: {e}")
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get location data: {str(e)}")
+
 
 @app.post("/api/stress/predict")
 def api_predict_stress(data: dict):
