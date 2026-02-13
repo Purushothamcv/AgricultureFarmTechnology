@@ -39,21 +39,31 @@ const Login = () => {
   }, []);
 
   const initializeGoogleSignIn = () => {
-    if (window.google) {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCallback,
-      });
-      window.google.accounts.id.renderButton(
-        document.getElementById('googleSignInButton'),
-        { 
-          theme: 'outline', 
-          size: 'large',
-          width: '100%',
-          text: 'signin_with',
-          shape: 'rectangular'
-        }
-      );
+    if (window.google && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('YOUR_GOOGLE')) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCallback,
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById('googleSignInButton'),
+          { 
+            theme: 'outline', 
+            size: 'large',
+            width: 350,  // Must be a number, not percentage
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left'
+          }
+        );
+      } catch (err) {
+        console.error('Google Sign-In initialization failed:', err);
+        setGoogleLoaded(false);
+      }
+    } else {
+      // Google Client ID not configured - hide the button
+      setGoogleLoaded(false);
+      console.log('Google OAuth not configured. Set VITE_GOOGLE_CLIENT_ID to enable.');
     }
   };
 
@@ -182,22 +192,27 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
-            </div>
-          </div>
+          {/* Google Sign-In Button - Only show if configured */}
+          {GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('YOUR_GOOGLE') && (
+            <>
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
 
-          {/* Google Sign-In Button */}
-          <div id="googleSignInButton" className="flex justify-center"></div>
-          {!googleLoaded && (
-            <div className="flex justify-center py-2">
-              <Loader className="w-5 h-5 animate-spin text-gray-400" />
-            </div>
+              {/* Google Sign-In Button */}
+              <div id="googleSignInButton" className="flex justify-center"></div>
+              {!googleLoaded && (
+                <div className="flex justify-center py-2">
+                  <Loader className="w-5 h-5 animate-spin text-gray-400" />
+                </div>
+              )}
+            </>
           )}
 
           <div className="mt-6 text-center">
