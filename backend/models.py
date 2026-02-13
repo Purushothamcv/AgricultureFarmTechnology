@@ -112,3 +112,42 @@ class MessageResponse(BaseModel):
                 "message": "Operation successful"
             }
         }
+
+
+class TokenResponse(BaseModel):
+    """
+    Schema for login response with JWT token
+    """
+    message: str
+    user: dict
+    access_token: str
+    token_type: str = "bearer"
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "Login successful",
+                "user": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "name": "John Doe",
+                    "email": "john.doe@example.com",
+                    "role": "user"
+                },
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer"
+            }
+        }
+
+
+class GoogleAuthRequest(BaseModel):
+    """
+    Schema for Google OAuth authentication request
+    """
+    credential: str = Field(..., description="Google ID token")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "credential": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjE4MmU0..."
+            }
+        }
