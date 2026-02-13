@@ -981,3 +981,8 @@ def api_chatbot(data: dict):
         return {"response": "Hello! I'm your Smart Agri AI assistant. How can I help you today?"}
     else:
         return {"response": "I can help you with weather data, crop recommendations, yield predictions, fertilizer suggestions, stress monitoring, spray timing, and disease detection. What would you like to know?"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
