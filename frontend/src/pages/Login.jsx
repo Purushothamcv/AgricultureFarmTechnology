@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { Leaf, Mail, Lock, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import InputField from '../components/InputField';
 
+// Google Client ID - Replace with your actual Google Client ID
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
+
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -12,10 +15,63 @@ const Login = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoaded, setGoogleLoaded] = useState(false);
   
-  const { login, isAuthenticated } = useAuth();
+  const { login, googleLogin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    // Load Google Sign-In script
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      setGoogleLoaded(true);
+      initializeGoogleSignIn();
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const initializeGoogleSignIn = () => {
+    if (window.google) {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCallback,
+      });
+      window.google.accounts.id.renderButton(
+        document.getElementById('googleSignInButton'),
+        { 
+          theme: 'outline', 
+          size: 'large',
+          width: '100%',
+          text: 'signin_with',
+          shape: 'rectangular'
+        }
+      );
+    }
+  };
+
+  const handleGoogleCallback = async (response) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const result = await googleLogin(response.credential);
+      if (result.success || result.access_token) {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Google sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Redirect if already authenticated
@@ -125,6 +181,24 @@ const Login = () => {
               )}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <div id="googleSignInButton" className="flex justify-center"></div>
+          {!googleLoaded && (
+            <div className="flex justify-center py-2">
+              <Loader className="w-5 h-5 animate-spin text-gray-400" />
+            </div>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
