@@ -7,7 +7,11 @@ export const authService = {
       const response = await api.post('/auth/login', credentials);
       console.log('✅ Login response:', response.data);
       
-      // Store user info (no token in current implementation)
+      // Store JWT token and user info
+      if (response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
+        console.log('🔑 JWT token stored');
+      }
       if (response.data.user) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         console.log('💾 User stored in localStorage:', response.data.user);
@@ -15,6 +19,30 @@ export const authService = {
       return response.data;
     } catch (error) {
       console.error('❌ Login failed:', error);
+      console.error('   Error response:', error.response?.data);
+      console.error('   Status code:', error.response?.status);
+      throw error;
+    }
+  },
+
+  async googleLogin(credential) {
+    try {
+      console.log('🔐 Attempting Google OAuth login...');
+      const response = await api.post('/auth/google', { credential });
+      console.log('✅ Google login response:', response.data);
+      
+      // Store JWT token and user info
+      if (response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
+        console.log('🔑 JWT token stored');
+      }
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('💾 User stored in localStorage:', response.data.user);
+      }
+      return response.data;
+    } catch (error) {
+      console.error('❌ Google login failed:', error);
       console.error('   Error response:', error.response?.data);
       console.error('   Status code:', error.response?.status);
       throw error;
