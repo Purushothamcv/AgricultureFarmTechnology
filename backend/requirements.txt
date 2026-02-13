@@ -11,9 +11,12 @@ fastapi
 uvicorn
 motor
 pymongo
-passlib[bcrypt]
+bcrypt>=4.0.0
 python-dotenv
 pydantic[email]
+python-jose[cryptography]>=3.3.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
 
 # Fruit Disease Detection Dependencies
 tensorflow>=2.13.0
