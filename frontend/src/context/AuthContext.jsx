@@ -41,6 +41,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleLogin = async (credential) => {
+    try {
+      console.log('🔐 AuthContext: Starting Google login process...');
+      const data = await authService.googleLogin(credential);
+      console.log('✅ AuthContext: Google login successful, setting user state');
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ AuthContext: Google login failed');
+      console.error('   Error details:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Google sign-in failed.';
+      console.error('   Error message:', errorMessage);
+      return { 
+        success: false, 
+        error: errorMessage
+      };
+    }
+  };
+
   const register = async (userData) => {
     try {
       console.log('📝 AuthContext: Starting registration process...');
@@ -68,6 +87,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
+    googleLogin,
     register,
     logout,
     isAuthenticated: !!user,
