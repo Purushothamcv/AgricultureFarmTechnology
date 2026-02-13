@@ -2,28 +2,60 @@ import api from './api';
 
 export const authService = {
   async login(credentials) {
-    const response = await api.post('/auth/login', credentials);
-    // Store user info (no token in current implementation)
-    if (response.data.user) {
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    try {
+      console.log('🔐 Attempting login for:', credentials.email);
+      const response = await api.post('/auth/login', credentials);
+      console.log('✅ Login response:', response.data);
+      
+      // Store user info (no token in current implementation)
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('💾 User stored in localStorage:', response.data.user);
+      }
+      return response.data;
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      console.error('   Error response:', error.response?.data);
+      console.error('   Status code:', error.response?.status);
+      throw error;
     }
-    return response.data;
   },
 
   async register(userData) {
-    const response = await api.post('/auth/register', userData);
-    // Registration successful, but user needs to login
-    return response.data;
+    try {
+      console.log('📝 Attempting registration for:', userData.email);
+      console.log('   User data:', { name: userData.name, email: userData.email });
+      const response = await api.post('/auth/register', userData);
+      console.log('✅ Registration response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Registration failed:', error);
+      console.error('   Error response:', error.response?.data);
+      console.error('   Status code:', error.response?.status);
+      throw error;
+    }
   },
 
   logout() {
+    console.log('🚪 Logging out user');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   },
 
   getCurrentUser() {
     const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        console.log('👤 Current user from storage:', user.email);
+        return user;
+      } catch (e) {
+        console.error('❌ Failed to parse user from localStorage:', e);
+        localStorage.removeItem('user');
+        return null;
+      }
+    }
+    return null;
   },
 
   getToken() {
