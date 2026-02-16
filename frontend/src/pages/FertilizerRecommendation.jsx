@@ -6,7 +6,7 @@ import { Droplet, Sparkles, MapPin, X } from 'lucide-react';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 const FertilizerRecommendation = () => {
   const [formData, setFormData] = useState({
