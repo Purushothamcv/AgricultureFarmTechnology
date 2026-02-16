@@ -122,20 +122,61 @@ const YieldPrediction = () => {
       const data = await response.json();
       
       if (data.address) {
-        const state = data.address.state || '';
-        const district = data.address.state_district || data.address.county || '';
+        const geocodedState = data.address.state || '';
+        const geocodedDistrict = data.address.state_district || data.address.county || '';
         
-        console.log('📍 Location from map:', { state, district, lat, lng });
+        console.log('📍 Location from map:', { state: geocodedState, district: geocodedDistrict, lat, lng });
         
-        // Update form with map location
-        setFormData(prev => ({
-          ...prev,
-          state: state,
-          district: district
-        }));
+        // Find matching state from available options (case-insensitive)
+        const matchingState = options.states.find(s => 
+          s.toLowerCase() === geocodedState.toLowerCase()
+        );
         
-        setShowMap(false);
-        alert(`Location selected:\nState: ${state}\nDistrict: ${district}`);
+        if (matchingState) {
+          console.log('✓ Found matching state:', matchingState);
+          
+          // First set the state - this will trigger district loading via useEffect
+          setFormData(prev => ({
+            ...prev,
+            state: matchingState,
+            district: '' // Clear district initially
+          }));
+          
+          // Load districts for this state and then find matching district
+          try {
+            const districtResponse = await fetch(`http://localhost:8000/yield/districts/${encodeURIComponent(matchingState)}`);
+            const districtData = await districtResponse.json();
+            
+            if (districtData.success && districtData.districts) {
+              // Find matching district (case-insensitive, partial match)
+              const matchingDistrict = districtData.districts.find(d => 
+                d.toLowerCase().includes(geocodedDistrict.toLowerCase()) ||
+                geocodedDistrict.toLowerCase().includes(d.toLowerCase())
+              );
+              
+              if (matchingDistrict) {
+                console.log('✓ Found matching district:', matchingDistrict);
+                // Set the district after a short delay to ensure state update is processed
+                setTimeout(() => {
+                  setFormData(prev => ({
+                    ...prev,
+                    district: matchingDistrict
+                  }));
+                }, 100);
+              } else {
+                console.warn('⚠️ No matching district found in list:', geocodedDistrict);
+              }
+            }
+          } catch (districtErr) {
+            console.error('Error loading districts:', districtErr);
+          }
+          
+          setShowMap(false);
+          alert(`Location selected:\nState: ${matchingState}\nDistrict: ${geocodedDistrict}\n\nCheck the form below to verify the values.`);
+        } else {
+          console.warn('⚠️ No matching state found in list:', geocodedState);
+          alert(`Location found: ${geocodedState}, ${geocodedDistrict}\n\nHowever, this state is not available in the database.\nPlease select manually from the dropdown.`);
+        }
       }
     } catch (err) {
       console.error('Error in reverse geocoding:', err);
