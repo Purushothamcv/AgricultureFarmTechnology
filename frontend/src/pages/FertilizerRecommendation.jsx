@@ -45,6 +45,7 @@ const FertilizerRecommendation = () => {
   const [showMap, setShowMap] = useState(false);
   const [locationData, setLocationData] = useState(null);
   const [mapLoading, setMapLoading] = useState(false);
+  const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
 
   // Load dropdown options on mount
   useEffect(() => {
@@ -145,6 +146,53 @@ const FertilizerRecommendation = () => {
       Humidity: '',
       Rainfall: ''
     }));
+  };
+
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLoadingCurrentLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('📍 Got current location:', latitude, longitude);
+        
+        // Use the same function as map click to populate fields
+        await handleMapLocationSelect(latitude, longitude);
+        setLoadingCurrentLocation(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        let errorMessage = 'Could not get your location. ';
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        setLoadingCurrentLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -250,14 +298,25 @@ const FertilizerRecommendation = () => {
                         </div>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setShowMap(true)}
-                        className="btn-secondary w-full flex items-center justify-center"
-                      >
-                        <MapPin className="w-4 h-4 mr-2" />
-                        Select Location from Map
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={getCurrentLocation}
+                          disabled={loadingCurrentLocation}
+                          className="btn-secondary flex-1 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed bg-green-100 hover:bg-green-200 text-green-700"
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          {loadingCurrentLocation ? 'Getting Location...' : 'Use My Location'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowMap(true)}
+                          className="btn-secondary flex-1 flex items-center justify-center"
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Select from Map
+                        </button>
+                      </div>
                     )}
                   </div>
 
