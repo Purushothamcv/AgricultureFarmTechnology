@@ -25,6 +25,8 @@ from chatbot_service import router as chatbot_router, startup_event as chatbot_s
 from yield_prediction_service import get_yield_service, startup_event as yield_startup
 # Import Fertilizer Prediction Service (Dataset-based ML)
 from fertilizer_prediction_service import get_fertilizer_service
+# Import Stress Prediction Service (Simplified Farmer-Friendly Model)
+from stress_prediction_service import stress_service
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -817,79 +819,96 @@ def get_fertilizer_location_data(data: dict):
         raise HTTPException(status_code=500, detail=f"Failed to get location data: {str(e)}")
 
 
+# ====================================================================
+# STRESS PREDICTION API - Simplified Farmer-Friendly Model
+# ====================================================================
+
+@app.get("/api/stress/options")
+def get_stress_options():
+    """Get dropdown options for stress prediction form"""
+    try:
+        options = stress_service.get_options()
+        return {
+            "success": True,
+            "options": options
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @app.post("/api/stress/predict")
 def api_predict_stress(data: dict):
-    # Get user inputs
-    soilMoisture = data.get('soilMoisture', 0.5)
-    ozone = data.get('ozone', 40)
-    
-    # Weather params - use provided values OR auto-fetch
-    temp = data.get('temperature')
-    humidity = data.get('humidity')
-    rainfall = data.get('rainfall')
-    windSpeed = data.get('windSpeed')
-    
-    # If weather not provided, auto-fetch using lat/lon
-    if temp is None or humidity is None or rainfall is None or windSpeed is None:
-        lat = data.get('lat', 20.5937)
-        lon = data.get('lon', 78.9629)
+    """Predict crop stress level using ML model with farmer-friendly inputs"""
+    try:
+        # Auto-fetch weather data if location provided and weather not included
+        if 'lat' in data and 'lng' in data:
+            if 'temperature' not in data or data.get('temperature') is None:
+                lat = data['lat']
+                lng = data['lng']
+                weather = fetch_weather_data(lat, lng)
+                
+                if weather:
+                    data.setdefault('temperature', weather.get('temp', 25))
+                    data.setdefault('humidity', weather.get('humidity', 60))
+                    data.setdefault('rainfall', weather.get('rain', 50))
+                    data.setdefault('wind_speed', weather.get('wind', 10))
         
-        weather = fetch_weather_data(lat, lon)
-        if weather:
-            temp = weather['temp'] if temp is None else temp
-            humidity = weather['humidity'] if humidity is None else humidity
-            rainfall = weather['rain'] if rainfall is None else rainfall
-            windSpeed = weather['wind'] if windSpeed is None else windSpeed
-        else:
-            # Use defaults if weather fetch fails
-            temp = temp or 25
-            humidity = humidity or 60
-            rainfall = rainfall or 0
-            windSpeed = windSpeed or 10
-    
-    # Simple stress level calculation
-    stress_score = 0
-    factors = []
-    
-    if temp > 35 or temp < 10:
-        stress_score += 2
-        factors.append("Extreme temperature")
-    if humidity < 30 or humidity > 90:
-        stress_score += 1
-        factors.append("Humidity stress")
-    if soilMoisture < 0.2:
-        stress_score += 2
-        factors.append("Low soil moisture")
-    if rainfall > 100:
-        stress_score += 1
-        factors.append("Excessive rainfall")
-    if windSpeed > 40:
-        stress_score += 1
-        factors.append("High wind speed")
-    if ozone > 80:
-        stress_score += 1
-        factors.append("High ozone levels")
-    
-    if stress_score >= 4:
-        level = "High"
-    elif stress_score >= 2:
-        level = "Moderate"
-    else:
-        level = "Low"
-    
-    return {
-        "level": level,
-        "factors": factors if factors else ["Optimal conditions"],
-        "score": stress_score,
-        "weather_used": {
-            "temperature": temp,
-            "humidity": humidity,
-            "rainfall": rainfall,
-            "windSpeed": windSpeed,
-            "soilMoisture": soilMoisture,
-            "ozone": ozone
+        # Make prediction
+        result = stress_service.predict(data)
+        return result
+        
+    except Exception as e:
+        print(f"❌ Stress prediction error: {e}")
+        return {
+            "success": False,
+            "error": str(e)
         }
-    }
+
+@app.post("/api/stress/location-data")
+async def get_stress_location_data(data: dict):
+    """Fetch location and weather data for stress prediction"""
+    try:
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not latitude or not longitude:
+            return {
+                "success": False,
+                "error": "Latitude and longitude are required"
+            }
+        
+        # Fetch weather data
+        weather = fetch_weather_data(latitude, longitude)
+        
+        if not weather:
+            return {
+                "success": False,
+                "error": "Failed to fetch weather data"
+            }
+        
+        # For simplicity, use default values for some fields
+        # In production, you'd fetch from actual APIs
+        return {
+            "success": True,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature": weather.get('temp', 25),
+            "humidity": weather.get('humidity', 60),
+            "rainfall": weather.get('rain', 50),
+            "wind_speed": weather.get('wind', 10),
+            "elevation": 500,  # Default, would need elevation API
+            "water_flow": 50,  # Default, would need sensor data
+            "drainage": 70,    # Default, would need sensor data
+        }
+        
+    except Exception as e:
+        print(f"❌ Location data error: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 @app.post("/api/spray/recommend")
 def api_recommend_spray_time(data: SprayRequest):

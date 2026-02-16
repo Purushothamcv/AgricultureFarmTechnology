@@ -1,48 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import InputField from '../components/InputField';
-import ResultCard from '../components/ResultCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { cropService } from '../services/services';
-import { AlertTriangle, Cloud, RefreshCw } from 'lucide-react';
+import axios from 'axios';
+import { AlertTriangle, MapPin, Sprout, Map } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const StressPrediction = () => {
-  const [manualWeather, setManualWeather] = useState(false);
   const [formData, setFormData] = useState({
+    // Manual Farmer Inputs
+    crop_type: '',
+    growth_stage: '',
+    soil_moisture: '',
+    soil_ph: '7.0',
+    organic_matter: '3.0',
+    pest_damage: '0',
+    weed_coverage: '0',
+    
+    // Auto-Fetch from Map/APIs
     temperature: '',
     humidity: '',
-    soilMoisture: '',
     rainfall: '',
-    ozone: '40',
-    windSpeed: '',
+    wind_speed: '',
+    elevation: '500',
+    water_flow: '50',
+    drainage: '70',
+    
+    // Location
     lat: '',
     lng: ''
   });
+  
+  const [options, setOptions] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [weatherSource, setWeatherSource] = useState('auto');
+  const [showMap, setShowMap] = useState(false);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
 
-  // Load weather data from localStorage on mount
+  // Load dropdown options on mount
   useEffect(() => {
-    const storedWeather = localStorage.getItem('currentWeather');
-    if (storedWeather) {
+    const loadOptions = async () => {
       try {
-        const weather = JSON.parse(storedWeather);
-        setFormData(prev => ({
-          ...prev,
-          temperature: weather.temperature?.toString() || '',
-          humidity: weather.humidity?.toString() || '',
-          rainfall: weather.rainfall?.toString() || '',
-          windSpeed: weather.wind_speed?.toString() || '',
-          lat: weather.lat?.toString() || '',
-          lng: weather.lng?.toString() || ''
-        }));
-        setWeatherSource('auto');
-        console.log('✅ Auto-filled weather for Stress Prediction:', weather);
-      } catch (e) {
-        console.error('Failed to parse stored weather', e);
+        const response = await axios.get(`${API_URL}/api/stress/options`);
+        if (response.data.success) {
+          setOptions(response.data.options);
+        }
+      } catch (error) {
+        console.error('Failed to load stress options:', error);
       }
-    }
+    };
+    loadOptions();
   }, []);
 
   const handleChange = (e) => {
@@ -52,28 +61,108 @@ const StressPrediction = () => {
     });
   };
 
-  const handleToggleManual = () => {
-    setManualWeather(!manualWeather);
-    setWeatherSource(manualWeather ? 'auto' : 'manual');
-  };
-
   const handleReset = () => {
-    const storedWeather = localStorage.getItem('currentWeather');
-    const weather = storedWeather ? JSON.parse(storedWeather) : {};
-    
     setFormData({
-      temperature: weather.temperature?.toString() || '',
-      humidity: weather.humidity?.toString() || '',
-      soilMoisture: '',
-      rainfall: weather.rainfall?.toString() || '',
-      ozone: '40',
-      windSpeed: weather.wind_speed?.toString() || '',
-      lat: weather.lat?.toString() || '',
-      lng: weather.lng?.toString() || ''
+      crop_type: '',
+      growth_stage: '',
+      soil_moisture: '',
+      soil_ph: '7.0',
+      organic_matter: '3.0',
+      pest_damage: '0',
+      weed_coverage: '0',
+      temperature: '',
+      humidity: '',
+      rainfall: '',
+      wind_speed: '',
+      elevation: '500',
+      water_flow: '50',
+      drainage: '70',
+      lat: '',
+      lng: ''
     });
     setResult(null);
-    setManualWeather(false);
-    setWeatherSource('auto');
+  };
+
+  const handleMapLocationSelect = async (lat, lng) => {
+    setMapLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/stress/location-data`, {
+        latitude: lat,
+        longitude: lng
+      });
+
+      if (response.data.success) {
+        const data = response.data;
+        
+        // Auto-fill weather and location data
+        setFormData(prev => ({
+          ...prev,
+          temperature: data.temperature?.toFixed(1) || prev.temperature,
+          humidity: data.humidity?.toFixed(0) || prev.humidity,
+          rainfall: data.rainfall?.toFixed(1) || prev.rainfall,
+          wind_speed: data.wind_speed?.toFixed(1) || prev.wind_speed,
+          elevation: data.elevation?.toString() || prev.elevation,
+          water_flow: data.water_flow?.toString() || prev.water_flow,
+          drainage: data.drainage?.toString() || prev.drainage,
+          lat: lat.toString(),
+          lng: lng.toString()
+        }));
+
+        setShowMap(false);
+        alert(`Location data fetched!\nWeather data has been auto-filled.`);
+      }
+    } catch (err) {
+      console.error('Error fetching location data:', err);
+      alert('Failed to fetch location data. Please try again or enter manually.');
+    }
+    setMapLoading(false);
+  };
+
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLoadingCurrentLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('📍 Got current location:', latitude, longitude);
+        
+        // Use the same function as map click to populate fields
+        await handleMapLocationSelect(latitude, longitude);
+        setLoadingCurrentLocation(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        let errorMessage = 'Could not get your location. ';
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        setLoadingCurrentLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -83,128 +172,256 @@ const StressPrediction = () => {
 
     try {
       const payload = {
-        soilMoisture: parseFloat(formData.soilMoisture),
-        ozone: parseFloat(formData.ozone),
+        // Manual inputs
+        crop_type: formData.crop_type,
+        growth_stage: formData.growth_stage,
+        soil_moisture: parseFloat(formData.soil_moisture),
+        soil_ph: parseFloat(formData.soil_ph),
+        organic_matter: parseFloat(formData.organic_matter),
+        pest_damage: parseFloat(formData.pest_damage),
+        weed_coverage: parseFloat(formData.weed_coverage),
+        
+        // Auto-fetch/Manual weather
+        temperature: parseFloat(formData.temperature),
+        humidity: parseFloat(formData.humidity),
+        rainfall: parseFloat(formData.rainfall),
+        wind_speed: parseFloat(formData.wind_speed),
+        elevation: parseFloat(formData.elevation),
+        water_flow: parseFloat(formData.water_flow),
+        drainage: parseFloat(formData.drainage),
+        
+        // Location
         lat: parseFloat(formData.lat) || 20.5937,
         lng: parseFloat(formData.lng) || 78.9629
       };
 
-      // Include weather only if manually editing
-      if (manualWeather) {
-        payload.temperature = parseFloat(formData.temperature);
-        payload.humidity = parseFloat(formData.humidity);
-        payload.rainfall = parseFloat(formData.rainfall);
-        payload.windSpeed = parseFloat(formData.windSpeed);
-      }
-
       console.log('📤 Sending stress prediction request:', payload);
-      const data = await cropService.predictStress(payload);
-      console.log('📥 Received stress prediction:', data);
-      setResult(data);
+      
+      const response = await axios.post(`${API_URL}/api/stress/predict`, payload);
+      
+      if (response.data.success) {
+        setResult(response.data);
+        console.log('📥 Received prediction:', response.data);
+      } else {
+        throw new Error(response.data.error || 'Prediction failed');
+      }
     } catch (err) {
       console.error('Error:', err);
-      // Demo fallback
-      const stressLevels = ['Low', 'Moderate', 'High'];
-      const level = stressLevels[Math.floor(Math.random() * stressLevels.length)];
-      setResult({
-        level: level,
-        factors: level === 'High' 
-          ? ['Extreme temperature', 'Low soil moisture'] 
-          : level === 'Moderate'
-          ? ['Humidity stress']
-          : ['Optimal conditions'],
-        score: level === 'High' ? 4 : level === 'Moderate' ? 2 : 0,
-        weather_used: {
-          temperature: formData.temperature,
-          humidity: formData.humidity,
-          rainfall: formData.rainfall,
-          windSpeed: formData.windSpeed
-        }
-      });
+      alert(`Prediction failed: ${err.response?.data?.error || err.message}`);
     }
     setLoading(false);
   };
 
-  const getStressType = (level) => {
-    if (!level) return 'info';
-    if (level.toLowerCase().includes('low')) return 'success';
-    if (level.toLowerCase().includes('medium')) return 'warning';
-    return 'error';
-  };
+  if (!options) {
+    return (
+      <div className="page-container">
+        <Navbar />
+        <div className="page-content flex items-center justify-center">
+          <LoadingSpinner text="Loading stress prediction system..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
       <Navbar />
       
       <div className="page-content">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center">
               <AlertTriangle className="w-8 h-8 mr-3 text-primary-600" />
-              Stress Prediction
+              Crop Stress Level Prediction
             </h1>
-            <p className="text-gray-600">Predict and monitor crop stress levels</p>
+            <p className="text-gray-600">
+              ML-based stress prediction using farmer-friendly inputs
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <div className="card">
                 <form onSubmit={handleSubmit}>
-                  {/* Soil Parameters */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <InputField
-                      label="Soil Moisture (0-1)"
-                      name="soilMoisture"
-                      type="number"
-                      value={formData.soilMoisture}
-                      onChange={handleChange}
-                      placeholder="0.5"
-                      required
-                      min="0"
-                      max="1"
-                      step="0.01"
-                    />
-                    <InputField
-                      label="Ozone (ppb)"
-                      name="ozone"
-                      type="number"
-                      value={formData.ozone}
-                      onChange={handleChange}
-                      placeholder="40"
-                      required
-                      min="0"
-                      max="100"
-                      step="1"
-                    />
-                  </div>
-
-                  {/* Weather Section with Auto-fill */}
-                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  {/* Location Section with Live Location */}
+                  <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        <Cloud className="w-5 h-5 mr-2 text-blue-600" />
-                        <h3 className="text-sm font-semibold text-gray-800">
-                          Weather Parameters
-                        </h3>
+                      <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <MapPin className="w-5 h-5 mr-2 text-primary-600" />
+                        Location & Weather Data
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={getCurrentLocation}
+                          disabled={loadingCurrentLocation}
+                          className="text-sm px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-md flex items-center gap-1 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          {loadingCurrentLocation ? 'Getting Location...' : 'Use My Location'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowMap(!showMap)}
+                          className="text-sm px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md flex items-center gap-1 transition"
+                        >
+                          <Map className="w-4 h-4" />
+                          {showMap ? 'Hide Map' : 'Select from Map'}
+                        </button>
                       </div>
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={manualWeather}
-                          onChange={handleToggleManual}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">Manual Edit</span>
-                      </label>
                     </div>
 
-                    {weatherSource === 'auto' && !manualWeather && (
-                      <div className="mb-2 text-xs text-blue-700 flex items-center">
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Auto-filled from Dashboard. Enable "Manual Edit" to customize.
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-600 mb-2">
+                      Weather data will be auto-filled when you select a location
+                    </div>
+                  </div>
 
+                  {/* Crop Information */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <Sprout className="w-5 h-5 mr-2 text-primary-600" />
+                      Crop Information
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Crop Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="crop_type"
+                          value={formData.crop_type}
+                          onChange={handleChange}
+                          required
+                          className="input-field"
+                        >
+                          <option value="">Select Crop</option>
+                          {options.crop_types.map(crop => (
+                            <option key={crop} value={crop}>{crop}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Growth Stage <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="growth_stage"
+                          value={formData.growth_stage}
+                          onChange={handleChange}
+                          required
+                          className="input-field"
+                        >
+                          <option value="">Select Stage</option>
+                          {options.growth_stages.map(stage => (
+                            <option key={stage} value={stage}>{stage}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Soil Parameters */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <div className="w-2 h-6 bg-primary-600 mr-2"></div>
+                      Soil Parameters
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <InputField
+                        label="Soil Moisture (%)"
+                        name="soil_moisture"
+                        type="number"
+                        value={formData.soil_moisture}
+                        onChange={handleChange}
+                        placeholder="50"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                      <InputField
+                        label="Soil pH"
+                        name="soil_ph"
+                        type="number"
+                        value={formData.soil_ph}
+                        onChange={handleChange}
+                        placeholder="7.0"
+                        required
+                        min="0"
+                        max="14"
+                        step="0.1"
+                      />
+                      <InputField
+                        label="Organic Matter (%)"
+                        name="organic_matter"
+                        type="number"
+                        value={formData.organic_matter}
+                        onChange={handleChange}
+                        placeholder="3.0"
+                        required
+                        min="0"
+                        max="10"
+                        step="0.1"
+                      />
+                      <InputField
+                        label="Drainage Quality (0-100)"
+                        name="drainage"
+                        type="number"
+                        value={formData.drainage}
+                        onChange={handleChange}
+                        placeholder="70"
+                        required
+                        min="0"
+                        max="100"
+                        step="1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pest & Weed */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <div className="w-2 h-6 bg-red-600 mr-2"></div>
+                      Pest & Weed Status
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <InputField
+                        label="Pest Damage (%)"
+                        name="pest_damage"
+                        type="number"
+                        value={formData.pest_damage}
+                        onChange={handleChange}
+                        placeholder="0"
+                        required
+                        min="0"
+                        max="100"
+                        step="1"
+                      />
+                      <InputField
+                        label="Weed Coverage (%)"
+                        name="weed_coverage"
+                        type="number"
+                        value={formData.weed_coverage}
+                        onChange={handleChange}
+                        placeholder="0"
+                        required
+                        min="0"
+                        max="100"
+                        step="1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Environmental Factors (Auto-filled from location) */}
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">
+                      Environmental Factors (Auto-filled from location)
+                    </h3>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <InputField
                         label="Temperature (°C)"
@@ -213,7 +430,6 @@ const StressPrediction = () => {
                         value={formData.temperature}
                         onChange={handleChange}
                         placeholder="Auto-filled"
-                        disabled={!manualWeather}
                         required
                         step="0.1"
                       />
@@ -224,7 +440,6 @@ const StressPrediction = () => {
                         value={formData.humidity}
                         onChange={handleChange}
                         placeholder="Auto-filled"
-                        disabled={!manualWeather}
                         required
                         step="0.1"
                       />
@@ -235,41 +450,64 @@ const StressPrediction = () => {
                         value={formData.rainfall}
                         onChange={handleChange}
                         placeholder="Auto-filled"
-                        disabled={!manualWeather}
                         required
                         step="0.1"
                       />
                       <InputField
                         label="Wind Speed (km/h)"
-                        name="windSpeed"
+                        name="wind_speed"
                         type="number"
-                        value={formData.windSpeed}
+                        value={formData.wind_speed}
                         onChange={handleChange}
                         placeholder="Auto-filled"
-                        disabled={!manualWeather}
                         required
                         step="0.1"
+                      />
+                      <InputField
+                        label="Elevation (m)"
+                        name="elevation"
+                        type="number"
+                        value={formData.elevation}
+                        onChange={handleChange}
+                        placeholder="500"
+                        required
+                        step="1"
+                      />
+                      <InputField
+                        label="Water Flow (L/min)"
+                        name="water_flow"
+                        type="number"
+                        value={formData.water_flow}
+                        onChange={handleChange}
+                        placeholder="50"
+                        required
+                        step="1"
                       />
                     </div>
                   </div>
 
-                  {/* Reset Button */}
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="btn-secondary w-full mb-2"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Reset & Reload Weather
-                  </button>
-
-                  <button type="submit" disabled={loading} className="btn-primary w-full">
-                    {loading ? 'Analyzing...' : 'Predict Stress Level'}
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="btn-secondary flex-1"
+                    >
+                      Reset Form
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="btn-primary flex-1"
+                    >
+                      {loading ? 'Analyzing...' : 'Predict Stress Level'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
 
+            {/* Results Panel */}
             <div className="lg:col-span-1">
               <div className="sticky top-24">
                 {loading ? (
@@ -280,46 +518,59 @@ const StressPrediction = () => {
                   <div className="space-y-4">
                     {/* Stress Level */}
                     <div className={`card ${
-                      result.level === 'Low Stress' ? 'bg-gradient-to-br from-green-50 to-emerald-50' :
-                      result.level === 'Moderate Stress' ? 'bg-gradient-to-br from-yellow-50 to-amber-50' :
-                      'bg-gradient-to-br from-red-50 to-rose-50'
+                      result.stress_level === 'Low' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200' :
+                      result.stress_level === 'Moderate' ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200' :
+                      'bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-200'
                     }`}>
                       <div className="flex items-center mb-4">
-                        <div className={`p-2 rounded-lg mr-3 ${
-                          result.level === 'Low Stress' ? 'bg-green-500' :
-                          result.level === 'Moderate Stress' ? 'bg-yellow-500' :
+                        <div className={`p-3 rounded-lg mr-3 ${
+                          result.stress_level === 'Low' ? 'bg-green-500' :
+                          result.stress_level === 'Moderate' ? 'bg-yellow-500' :
                           'bg-red-500'
                         }`}>
                           <AlertTriangle className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-800">Stress Level</h3>
+                          <h3 className="text-sm font-medium text-gray-600">Stress Level</h3>
                           <p className={`text-2xl font-bold mt-1 ${
-                            result.level === 'Low Stress' ? 'text-green-600' :
-                            result.level === 'Moderate Stress' ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>{result.level}</p>
+                            result.stress_level === 'Low' ? 'text-green-700' :
+                            result.stress_level === 'Moderate' ? 'text-yellow-700' :
+                            'text-red-700'
+                          }`}>{result.stress_level}</p>
                         </div>
                       </div>
 
-                      {result.score !== undefined && (
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-600">Stress Score: <span className="font-semibold">{result.score.toFixed(2)}</span></p>
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-600">Model Confidence</p>
+                        <p className="text-lg font-semibold text-gray-800">{result.confidence_percentage}</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              result.stress_level === 'Low' ? 'bg-green-500' :
+                              result.stress_level === 'Moderate' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: result.confidence_percentage }}
+                          ></div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="pt-3 border-t border-gray-200">
+                        <p className="text-sm text-gray-700">{result.advice}</p>
+                      </div>
                     </div>
 
                     {/* Stress Factors */}
-                    {result.factors && result.factors.length > 0 && (
-                      <div className="card bg-orange-50">
-                        <div className="flex items-center mb-3">
-                          <AlertTriangle className="w-5 h-5 mr-2 text-orange-600" />
-                          <h4 className="text-sm font-semibold text-gray-800">Contributing Factors</h4>
-                        </div>
+                    {result.stress_factors && result.stress_factors.length > 0 && (
+                      <div className="card bg-orange-50 border border-orange-200">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                          <AlertTriangle className="w-4 h-4 mr-2 text-orange-600" />
+                          Identified Stress Factors
+                        </h4>
                         <ul className="space-y-2">
-                          {result.factors.map((factor, idx) => (
+                          {result.stress_factors.map((factor, idx) => (
                             <li key={idx} className="flex items-start text-sm text-gray-700">
-                              <span className="text-orange-600 mr-2">•</span>
+                              <span className="text-orange-600 mr-2 font-bold">•</span>
                               <span>{factor}</span>
                             </li>
                           ))}
@@ -327,47 +578,32 @@ const StressPrediction = () => {
                       </div>
                     )}
 
-                    {/* Weather Used */}
-                    {result.weather_used && (
-                      <div className="card bg-blue-50">
-                        <div className="flex items-center mb-3">
-                          <Cloud className="w-5 h-5 mr-2 text-blue-600" />
-                          <h4 className="text-sm font-semibold text-gray-800">Conditions Analyzed</h4>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Temperature:</span>
-                            <span className="font-medium">{result.weather_used.temperature}°C</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Humidity:</span>
-                            <span className="font-medium">{result.weather_used.humidity}%</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Rainfall:</span>
-                            <span className="font-medium">{result.weather_used.rainfall}mm</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Wind Speed:</span>
-                            <span className="font-medium">{result.weather_used.windSpeed}km/h</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Soil Moisture:</span>
-                            <span className="font-medium">{result.weather_used.soilMoisture}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Ozone:</span>
-                            <span className="font-medium">{result.weather_used.ozone}ppb</span>
-                          </div>
+                    {/* Recommendations */}
+                    {result.recommendations && result.recommendations.length > 0 && (
+                      <div className="card bg-blue-50 border border-blue-200">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                          Recommended Actions
+                        </h4>
+                        <div className="space-y-3">
+                          {result.recommendations.map((rec, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded-md">
+                              <p className="text-sm font-semibold text-blue-700">{rec.factor}</p>
+                              <p className="text-xs text-gray-600 mt-1">{rec.action}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="card bg-gray-50">
-                    <p className="text-gray-500 text-center">
-                      Enter environmental parameters to predict crop stress level
-                    </p>
+                    <div className="text-center py-8">
+                      <AlertTriangle className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                      <p className="text-gray-600 mb-2">No prediction yet</p>
+                      <p className="text-sm text-gray-500">
+                        Fill in the form and click "Predict Stress Level" to get results
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -379,19 +615,19 @@ const StressPrediction = () => {
             <div className="card bg-green-50 border-l-4 border-green-500">
               <h4 className="font-semibold text-green-800 mb-2">Low Stress</h4>
               <p className="text-sm text-gray-700">
-                Optimal growing conditions. Continue current management practices.
+                Crops are in optimal health. Continue current management practices and monitor regularly.
               </p>
             </div>
             <div className="card bg-yellow-50 border-l-4 border-yellow-500">
               <h4 className="font-semibold text-yellow-800 mb-2">Moderate Stress</h4>
               <p className="text-sm text-gray-700">
-                Monitor closely and adjust irrigation or nutrient management.
+                Monitor closely. Adjust irrigation, pest control, or nutrient management as needed.
               </p>
             </div>
             <div className="card bg-red-50 border-l-4 border-red-500">
               <h4 className="font-semibold text-red-800 mb-2">High Stress</h4>
               <p className="text-sm text-gray-700">
-                Immediate intervention required to prevent yield loss.
+                Immediate intervention required. Take urgent action to prevent yield loss.
               </p>
             </div>
           </div>
