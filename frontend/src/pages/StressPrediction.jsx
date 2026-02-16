@@ -5,7 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import axios from 'axios';
 import { AlertTriangle, MapPin, Sprout, Map } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 const StressPrediction = () => {
   const [formData, setFormData] = useState({
