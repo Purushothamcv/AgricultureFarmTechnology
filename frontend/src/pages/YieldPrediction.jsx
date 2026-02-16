@@ -26,6 +26,7 @@ const YieldPrediction = () => {
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
 
   // Load available options on component mount
   useEffect(() => {
@@ -228,6 +229,53 @@ const YieldPrediction = () => {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - 10 + i);
 
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLoadingCurrentLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('📍 Got current location:', latitude, longitude);
+        
+        // Use the same function as map click to populate fields
+        await handleMapLocationSelect(latitude, longitude);
+        setLoadingCurrentLocation(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        let errorMessage = 'Could not get your location. ';
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        setLoadingCurrentLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
   // Simple Map Selector Component
   const MapSelector = ({ onLocationSelect }) => {
     const [selectedLocation, setSelectedLocation] = useState(null);
@@ -325,14 +373,25 @@ const YieldPrediction = () => {
                           <MapPin className="w-5 h-5 mr-2 text-primary-600" />
                           Location
                         </h3>
-                        <button
-                          type="button"
-                          onClick={() => setShowMap(!showMap)}
-                          className="text-sm px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md flex items-center gap-1 transition"
-                        >
-                          <Map className="w-4 h-4" />
-                          {showMap ? 'Hide Map' : 'Select from Map'}
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={getCurrentLocation}
+                            disabled={loadingCurrentLocation}
+                            className="text-sm px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-md flex items-center gap-1 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <MapPin className="w-4 h-4" />
+                            {loadingCurrentLocation ? 'Getting Location...' : 'Use My Location'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowMap(!showMap)}
+                            className="text-sm px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md flex items-center gap-1 transition"
+                          >
+                            <Map className="w-4 h-4" />
+                            {showMap ? 'Hide Map' : 'Select from Map'}
+                          </button>
+                        </div>
                       </div>
 
                       {showMap && (
