@@ -40,9 +40,8 @@ services:
       - key: NEWSAPI_KEY
         sync: false  # Optional: for news features
       
-      # Server Configuration
-      - key: PORT
-        value: "8000"
+      # Note: PORT is automatically provided by Render
+      # Note: WEB_CONCURRENCY is automatically set by Render based on plan
     
     healthCheckPath: /health
   

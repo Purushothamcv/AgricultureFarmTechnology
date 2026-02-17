@@ -29,13 +29,14 @@ RUN mkdir -p model data static templates
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 
-# Expose port
+# Expose port (default, overridden by Render's PORT env var)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+# Health check disabled for Render deployment (uses dynamic ports)
+# Render has its own health check mechanism
 
 # Run application with uvicorn in production mode
-# Uses 4 workers for better performance
-CMD uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT} --workers 4
+# Uses shell form to properly expand PORT environment variable
+# Render provides PORT dynamically, defaults to 8000 for local dev
+# WEB_CONCURRENCY controls number of workers (Render sets this based on available CPUs)
+CMD sh -c "uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"
