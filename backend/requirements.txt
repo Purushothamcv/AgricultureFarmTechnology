@@ -2,8 +2,9 @@ streamlit
 numpy
 pandas
 matplotlib
-scikit-learn==1.6.1
+scikit-learn==1.5.1
 joblib
+xgboost>=2.0.0
 requests
 folium
 streamlit-folium
