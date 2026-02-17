@@ -1,0 +1,117 @@
+# ============================================
+# SmartAgri - Docker Compose Configuration
+# ============================================
+version: '3.8'
+
+services:
+  # MongoDB Database Service
+  mongodb:
+    image: mongo:6.0
+    container_name: smartagri-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-smartagri2024}
+      MONGO_INITDB_DATABASE: ${DATABASE_NAME:-FinalProject}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - smartagri-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # Backend Service (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartagri-backend
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      MONGODB_URL: ${MONGODB_URL:-mongodb://admin:smartagri2024@mongodb:27017}
+      DATABASE_NAME: ${DATABASE_NAME:-FinalProject}
+      
+      # JWT Configuration
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      
+      # Google OAuth Configuration
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      
+      # API Configuration
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # Groq AI Configuration
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      
+      # Weather API
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-90e50f067196b6d46932c52869d83ed6}
+      
+      # Production Settings
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      PORT: ${BACKEND_PORT:-8001}
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    volumes:
+      - ./backend/model:/app/model:ro
+      - ./backend/data:/app/data:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - smartagri-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend Service (React + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    container_name: smartagri-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - smartagri-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+# Named Volumes for Data Persistence
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+# Custom Network
+networks:
+  smartagri-network:
+    driver: bridge
