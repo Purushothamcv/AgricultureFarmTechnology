@@ -99,8 +99,10 @@ allowed_origins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
-    "https://agriculture-farm-technology.vercel.app",  # Your Vercel frontend
-    "https://*.vercel.app"  # Allow all Vercel preview deployments
+    "https://agriculture-farm-technology.vercel.app",
+    "https://*.vercel.app",
+    "https://smartagri-backend-ckcz.onrender.com",  # Allow backend to call itself
+    "https://*.onrender.com",  # Allow any Render frontend deployment
 ]
 
 print(f"🌐 CORS enabled for origins: {allowed_origins}")
