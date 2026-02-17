@@ -35,28 +35,55 @@ app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Sup
 async def startup_event():
     """Initialize MongoDB connection and ML models on application startup"""
     print("🚀 Starting SmartAgri API...")
+    
+    # MongoDB connection (already handles failures gracefully)
     await connect_to_mongodb()
-    # Initialize fruit disease detection model (legacy)
-    await fruit_startup()
-    # Initialize PRODUCTION fruit disease model (frozen, inference-only)
-    print("🔬 Initializing Production Fruit Disease Detection...")
-    await fruit_prod_startup()
-    # Initialize NEW V2 fruit disease model (clean trained - 92%+)
-    print("🍎 Initializing Fruit Disease V2 (Clean Model)...")
-    await fruit_v2_startup()
-    # Initialize Plant Leaf Disease Detection
-    print("🌿 Initializing Plant Leaf Disease Detection...")
-    await plant_disease_startup()
-    # Initialize AI Chatbot Service
-    print("🤖 Initializing AI Chatbot Service...")
-    await chatbot_startup()
-    # Initialize Yield Prediction Service
-    await yield_startup()
-    # Initialize Fertilizer Prediction Service
-    print("🌱 Initializing Fertilizer Prediction Service...")
-    fertilizer_service = get_fertilizer_service()
-    fertilizer_service.load_model()
-    print("✅ All services initialized")
+    
+    # Initialize each service with error handling
+    # If a service fails, log it but continue with others
+    
+    try:
+        await fruit_startup()
+    except Exception as e:
+        print(f"⚠️  Fruit disease service (legacy) failed to start: {e}")
+    
+    try:
+        print("🔬 Initializing Production Fruit Disease Detection...")
+        await fruit_prod_startup()
+    except Exception as e:
+        print(f"⚠️  Production fruit disease service failed to start: {e}")
+    
+    try:
+        print("🍎 Initializing Fruit Disease V2 (Clean Model)...")
+        await fruit_v2_startup()
+    except Exception as e:
+        print(f"⚠️  Fruit Disease V2 service failed to start: {e}")
+    
+    try:
+        print("🌿 Initializing Plant Leaf Disease Detection...")
+        await plant_disease_startup()
+    except Exception as e:
+        print(f"⚠️  Plant disease service failed to start: {e}")
+    
+    try:
+        print("🤖 Initializing AI Chatbot Service...")
+        await chatbot_startup()
+    except Exception as e:
+        print(f"⚠️  Chatbot service failed to start: {e}")
+    
+    try:
+        await yield_startup()
+    except Exception as e:
+        print(f"⚠️  Yield service failed to start: {e}")
+    
+    try:
+        print("🌱 Initializing Fertilizer Prediction Service...")
+        fertilizer_service = get_fertilizer_service()
+        fertilizer_service.load_model()
+    except Exception as e:
+        print(f"⚠️  Fertilizer service failed to start: {e}")
+    
+    print("✅ Startup complete - API ready to accept requests")
 
 @app.on_event("shutdown")
 async def shutdown_event():

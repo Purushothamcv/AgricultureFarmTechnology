@@ -470,10 +470,16 @@ async def startup_event():
         logger.info("✅ Plant Disease Detection Service initialized successfully!")
         logger.info(f"   Ready to detect {len(class_names)} disease classes")
         
+    except FileNotFoundError as e:
+        logger.warning(f"⚠️  Plant Disease Detection initialization skipped: {str(e)}")
+        logger.warning("   Large model file (547MB) not available - this is expected on Render.")
+        logger.warning("   Plant disease detection endpoint will return 503 Service Unavailable.")
+        # Don't raise - allow app to start without this feature
+        
     except Exception as e:
         logger.error(f"❌ Failed to initialize Plant Disease Detection: {str(e)}")
-        logger.error("   Service will not be available until this is fixed.")
-        raise
+        logger.error("   Plant disease detection endpoint will not be available.")
+        # Don't raise - allow app to start without this feature
 
 
 # ============================================================================
