@@ -8,7 +8,7 @@ import joblib
 import pandas as pd
 from utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
 from auth import router as auth_router
-from database import connect_to_mongodb, close_mongodb_connection
+from database import connect_to_mongodb, close_mongodb_connection, database
 from db_helpers import get_database_stats
 from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse
 from crop_service import predict_crop, fetch_all_location_data
