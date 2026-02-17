@@ -1,0 +1,133 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+train_fruit_disease.ipynb
+
+# Documentation
+docs/
+*.md
+!README.md
+ARCHITECTURE_DIAGRAM.md
+DEPLOYMENT_SUCCESS.md
+FILE_STRUCTURE.md
+HOW_TO_TRAIN.md
+INFERENCE_FIX_FLOW.md
+INFERENCE_FIXES_SUMMARY.md
+INTEGRATION_GUIDE.md
+PLANT_DISEASE_*.md
+PRODUCTION_DEPLOYMENT_GUIDE.md
+PROJECT_COMPLETE.md
+QUICK_REFERENCE.md
+RENDER_DEPLOYMENT.md
+TRAINING_IMPROVEMENTS.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test files
+test_*.py
+*_test.py
+verify_*.py
+preflight_check.py
+
+# Training scripts (keep only trained models)
+train_*.py
+START_TRAINING.py
+verify_and_train.py
+compare_training_scripts.py
+dataset_analyzer.py
+
+# Large data files (keep models, exclude raw data)
+data/raw/
+data/train/
+data/test/
+data/validation/
+actual/
+
+# CSV datasets (not needed in production)
+*.csv
+agriculture_dataset.csv
+APY.csv
+Crop_NPK.csv
+
+# Model training outputs
+confusion_matrix.png
+training_history.json
+training_history.png
+classification_report.txt
+
+# OS
+Thumbs.db
+.DS_Store
