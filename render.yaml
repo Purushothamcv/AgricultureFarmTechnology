@@ -1,17 +1,71 @@
+# Render.com deployment configuration for SmartAgri-AI
+# Supports both Docker and native Python/Node.js deployments
+
 services:
+  # Backend API Service (FastAPI)
   - type: web
     name: smartagri-backend
-    env: python
+    env: docker
     region: oregon
     plan: free
     branch: main
-    rootDir: backend
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main_fastapi:app --host 0.0.0.0 --port $PORT"
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.0
+      # MongoDB Connection
       - key: MONGODB_URL
-        sync: false
+        sync: false  # Set this in Render dashboard to your MongoDB Atlas connection string
       - key: DATABASE_NAME
         value: FinalProject
+      
+      # JWT Configuration
+      - key: SECRET_KEY
+        generateValue: true  # Auto-generate secure secret
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRATION_MINUTES
+        value: "10080"
+      
+      # Google OAuth
+      - key: GOOGLE_CLIENT_ID
+        value: 745305741156-di4f6tc9o7p6773hp21mh60u16m3anik.apps.googleusercontent.com
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false  # Set this in Render dashboard
+      
+      # API Keys
+      - key: GROQ_API_KEY
+        sync: false  # Required for AI chatbot
+      - key: OPENWEATHER_API_KEY
+        sync: false  # Optional: for weather features
+      - key: NEWSAPI_KEY
+        sync: false  # Optional: for news features
+      
+      # Server Configuration
+      - key: PORT
+        value: "8000"
+    
+    healthCheckPath: /health
+  
+  # Frontend Service (React + Vite)
+  - type: static
+    name: smartagri-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    branch: main
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://smartagri-backend.onrender.com  # Update this with your actual backend URL
+      - key: VITE_GOOGLE_CLIENT_ID
+        value: 745305741156-di4f6tc9o7p6773hp21mh60u16m3anik.apps.googleusercontent.com
+    
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://smartagri-backend.onrender.com/api/*  # Proxy API requests to backend
+      - type: rewrite
+        source: /*
+        destination: /index.html  # SPA routing support
+
+# Database (Use MongoDB Atlas free tier)
+# Sign up at: https://www.mongodb.com/cloud/atlas
+# Get connection string and add to MONGODB_URL environment variable
