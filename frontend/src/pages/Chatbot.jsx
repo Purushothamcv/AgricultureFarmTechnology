@@ -16,6 +16,9 @@ import ChatMessage from '../components/ChatMessage';
 import LanguageSelector from '../components/LanguageSelector';
 import { MessageCircle, Mic, MicOff, Volume2, VolumeX, Send, Trash2, Loader, Bot } from 'lucide-react';
 
+// Use environment variable or fallback to localhost:8001
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+
 const Chatbot = () => {
   // ============================================================================
   // STATE MANAGEMENT
@@ -176,7 +179,7 @@ const Chatbot = () => {
 
     try {
       // Call Groq AI backend
-      const response = await fetch('http://localhost:8000/chatbot/chat', {
+      const response = await fetch(`${API_URL}/chatbot/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -13,7 +13,8 @@ const InputField = ({
   step,
   disabled = false,
   icon: Icon,
-  autoComplete
+  autoComplete,
+  className = ''
 }) => {
   return (
     <div className="mb-4">
@@ -41,7 +42,7 @@ const InputField = ({
           step={step}
           disabled={disabled}
           autoComplete={autoComplete}
-          className={`input-field ${Icon ? 'pl-10' : ''} ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
+          className={`input-field ${Icon ? 'pl-10' : ''} ${disabled ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''} ${className}`}
         />
       </div>
     </div>

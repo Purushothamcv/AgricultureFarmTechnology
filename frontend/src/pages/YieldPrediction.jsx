@@ -6,6 +6,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { cropService } from '../services/services';
 import { TrendingUp, MapPin, Calendar, Sprout, Map } from 'lucide-react';
 
+// Use environment variable or fallback to localhost:8001
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+
 const YieldPrediction = () => {
   const [formData, setFormData] = useState({
     state: '',
@@ -27,6 +30,10 @@ const YieldPrediction = () => {
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
+  const [locationAutoFilled, setLocationAutoFilled] = useState({
+    state: false,
+    district: false
+  });
 
   // Load available options on component mount
   useEffect(() => {
@@ -46,7 +53,7 @@ const YieldPrediction = () => {
   const loadOptions = async () => {
     try {
       setLoadingOptions(true);
-      const response = await fetch('http://localhost:8000/yield/states');
+      const response = await fetch(`${API_URL}/yield/states`);
       const data = await response.json();
       
       if (data.success) {
@@ -58,7 +65,7 @@ const YieldPrediction = () => {
       }
 
       // Load crops and seasons separately
-      const optionsResponse = await fetch('http://localhost:8000/api/yield/options');
+      const optionsResponse = await fetch(`${API_URL}/api/yield/options`);
       const optionsData = await optionsResponse.json();
       
       if (optionsData.success) {
@@ -79,7 +86,7 @@ const YieldPrediction = () => {
   const loadDistrictsByState = async (state) => {
     try {
       setLoadingDistricts(true);
-      const response = await fetch(`http://localhost:8000/yield/districts/${encodeURIComponent(state)}`);
+      const response = await fetch(`${API_URL}/yield/districts/${encodeURIComponent(state)}`);
       const data = await response.json();
       
       if (data.success) {
@@ -99,6 +106,11 @@ const YieldPrediction = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     
+    // Clear auto-fill indicator when user manually changes
+    if (name === 'state' || name === 'district') {
+      setLocationAutoFilled(prev => ({ ...prev, [name]: false }));
+    }
+    
     // If state changes, clear district selection
     if (name === 'state') {
       setFormData({
@@ -106,6 +118,7 @@ const YieldPrediction = () => {
         state: value,
         district: '' // Clear district when state changes
       });
+      setLocationAutoFilled(prev => ({ ...prev, district: false }));
     } else {
       setFormData({
         ...formData,
@@ -115,26 +128,59 @@ const YieldPrediction = () => {
   };
 
   const handleMapLocationSelect = async (lat, lng) => {
+    setShowMap(false); // Close map immediately for better UX
+    
     try {
-      // Reverse geocoding using Nominatim (OpenStreetMap)
+      // Reverse geocoding using Nominatim (OpenStreetMap) with English language preference
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
+        {
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9'
+          }
+        }
       );
       const data = await response.json();
       
       if (data.address) {
-        const geocodedState = data.address.state || '';
-        const geocodedDistrict = data.address.state_district || data.address.county || '';
+        // Try multiple possible fields for state and district
+        const geocodedState = data.address.state || data.address.region || '';
+        const geocodedDistrict = data.address.state_district || 
+                                 data.address.county || 
+                                 data.address.district || 
+                                 data.address.city_district || '';
         
-        console.log('📍 Location from map:', { state: geocodedState, district: geocodedDistrict, lat, lng });
+        console.log('📍 Location from map:', { 
+          state: geocodedState, 
+          district: geocodedDistrict, 
+          lat, 
+          lng,
+          fullAddress: data.display_name 
+        });
         
-        // Find matching state from available options (case-insensitive)
-        const matchingState = options.states.find(s => 
-          s.toLowerCase() === geocodedState.toLowerCase()
-        );
+        // Helper function for fuzzy matching
+        const fuzzyMatch = (str1, str2) => {
+          if (!str1 || !str2) return false;
+          const s1 = str1.toLowerCase().trim();
+          const s2 = str2.toLowerCase().trim();
+          
+          // Exact match
+          if (s1 === s2) return true;
+          
+          // Contains match
+          if (s1.includes(s2) || s2.includes(s1)) return true;
+          
+          // Word match (at least one word matches)
+          const words1 = s1.split(/\s+/);
+          const words2 = s2.split(/\s+/);
+          return words1.some(w1 => words2.some(w2 => w1 === w2 && w1.length > 3));
+        };
+        
+        // Find matching state from available options (fuzzy matching)
+        const matchingState = options.states.find(s => fuzzyMatch(s, geocodedState));
         
         if (matchingState) {
-          console.log('✓ Found matching state:', matchingState);
+          console.log('✅ Found matching state:', matchingState);
           
           // First set the state - this will trigger district loading via useEffect
           setFormData(prev => ({
@@ -142,46 +188,48 @@ const YieldPrediction = () => {
             state: matchingState,
             district: '' // Clear district initially
           }));
+          setLocationAutoFilled(prev => ({ ...prev, state: true, district: false }));
           
           // Load districts for this state and then find matching district
           try {
-            const districtResponse = await fetch(`http://localhost:8000/yield/districts/${encodeURIComponent(matchingState)}`);
+            const districtResponse = await fetch(`${API_URL}/yield/districts/${encodeURIComponent(matchingState)}`);
             const districtData = await districtResponse.json();
             
             if (districtData.success && districtData.districts) {
-              // Find matching district (case-insensitive, partial match)
-              const matchingDistrict = districtData.districts.find(d => 
-                d.toLowerCase().includes(geocodedDistrict.toLowerCase()) ||
-                geocodedDistrict.toLowerCase().includes(d.toLowerCase())
-              );
+              // Find matching district using fuzzy matching
+              const matchingDistrict = districtData.districts.find(d => fuzzyMatch(d, geocodedDistrict));
               
               if (matchingDistrict) {
-                console.log('✓ Found matching district:', matchingDistrict);
+                console.log('✅ Found matching district:', matchingDistrict);
                 // Set the district after a short delay to ensure state update is processed
                 setTimeout(() => {
                   setFormData(prev => ({
                     ...prev,
                     district: matchingDistrict
                   }));
-                }, 100);
+                  setLocationAutoFilled(prev => ({ ...prev, district: true }));
+                }, 200);
+                
+                alert(`✅ Location Auto-filled Successfully!\n\nState: ${matchingState}\nDistrict: ${matchingDistrict}\n\nPlease verify the values in the form below and complete other fields.`);
               } else {
-                console.warn('⚠️ No matching district found in list:', geocodedDistrict);
+                console.warn('⚠️ No matching district found. Available:', districtData.districts.slice(0, 3));
+                alert(`✅ State auto-filled: ${matchingState}\n⚠️ District "${geocodedDistrict}" not found in database.\n\nPlease select the district manually from the dropdown.`);
               }
             }
           } catch (districtErr) {
             console.error('Error loading districts:', districtErr);
+            alert(`✅ State auto-filled: ${matchingState}\n\nPlease select the district manually.`);
           }
-          
-          setShowMap(false);
-          alert(`Location selected:\nState: ${matchingState}\nDistrict: ${geocodedDistrict}\n\nCheck the form below to verify the values.`);
         } else {
-          console.warn('⚠️ No matching state found in list:', geocodedState);
-          alert(`Location found: ${geocodedState}, ${geocodedDistrict}\n\nHowever, this state is not available in the database.\nPlease select manually from the dropdown.`);
+          console.warn('⚠️ No matching state found. Received:', geocodedState, 'Available:', options.states.slice(0, 5));
+          alert(`❌ Location Not Found in Database\n\nDetected: ${geocodedState}, ${geocodedDistrict}\n\nThis state is not available in the yield prediction database.\nPlease select State and District manually from the dropdowns.`);
         }
+      } else {
+        throw new Error('No address data received from geocoding service');
       }
     } catch (err) {
       console.error('Error in reverse geocoding:', err);
-      alert('Could not determine location. Please select manually.');
+      alert('❌ Could Not Determine Location\n\nPlease select State and District manually from the dropdowns.');
     }
   };
 
@@ -202,7 +250,7 @@ const YieldPrediction = () => {
 
       console.log('📤 Sending yield prediction request:', payload);
       
-      const response = await fetch('http://localhost:8000/predict-yield', {
+      const response = await fetch(`${API_URL}/predict-yield`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -279,6 +327,7 @@ const YieldPrediction = () => {
   // Simple Map Selector Component
   const MapSelector = ({ onLocationSelect }) => {
     const [selectedLocation, setSelectedLocation] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
       // Dynamically load Leaflet CSS
@@ -322,20 +371,30 @@ const YieldPrediction = () => {
       });
     };
 
+    const handleLocationConfirm = async () => {
+      setIsProcessing(true);
+      await onLocationSelect(selectedLocation.lat, selectedLocation.lng);
+      setIsProcessing(false);
+    };
+
     return (
       <div>
-        <div id="yield-map" style={{ height: '300px', width: '100%', borderRadius: '8px' }}></div>
+        <div className="mb-2 p-2 bg-blue-100 border border-blue-300 rounded text-sm text-blue-800">
+          📍 <strong>Click on the map</strong> to select your location. State and District will be auto-filled.
+        </div>
+        <div id="yield-map" style={{ height: '300px', width: '100%', borderRadius: '8px', border: '2px solid #e5e7eb' }}></div>
         {selectedLocation && (
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-3 flex items-center justify-between bg-green-50 p-3 rounded-lg border border-green-200">
             <p className="text-sm text-gray-700">
-              Selected: {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}
+              📌 Selected: <span className="font-mono font-semibold">{selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}</span>
             </p>
             <button
               type="button"
-              onClick={() => onLocationSelect(selectedLocation.lat, selectedLocation.lng)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+              onClick={handleLocationConfirm}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Use This Location
+              {isProcessing ? '🔄 Processing...' : '✓ Use This Location'}
             </button>
           </div>
         )}
@@ -400,17 +459,42 @@ const YieldPrediction = () => {
                         </div>
                       )}
 
+                      {(locationAutoFilled.state || locationAutoFilled.district) && (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-start">
+                          <div className="flex-shrink-0">
+                            <svg className="w-5 h-5 text-green-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3 flex-1">
+                            <p className="text-sm font-medium text-green-800">
+                              Location auto-filled from map
+                            </p>
+                            <p className="text-xs text-green-700 mt-1">
+                              {locationAutoFilled.state && `State: ${formData.state}`}
+                              {locationAutoFilled.state && locationAutoFilled.district && ' • '}
+                              {locationAutoFilled.district && `District: ${formData.district}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                             State <span className="text-red-500">*</span>
+                            {locationAutoFilled.state && (
+                              <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full flex items-center">
+                                ✓ Auto-filled
+                              </span>
+                            )}
                           </label>
                           <select
                             name="state"
                             value={formData.state}
                             onChange={handleChange}
                             required
-                            className="input-field"
+                            className={`input-field ${locationAutoFilled.state ? 'bg-green-50 border-green-300' : ''}`}
                           >
                             <option value="">Select State</option>
                             {options.states.map(state => (
@@ -420,8 +504,13 @@ const YieldPrediction = () => {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                             District <span className="text-red-500">*</span>
+                            {locationAutoFilled.district && (
+                              <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full flex items-center">
+                                ✓ Auto-filled
+                              </span>
+                            )}
                           </label>
                           <select
                             name="district"
@@ -429,7 +518,7 @@ const YieldPrediction = () => {
                             onChange={handleChange}
                             required
                             disabled={!formData.state || loadingDistricts}
-                            className="input-field"
+                            className={`input-field ${locationAutoFilled.district ? 'bg-green-50 border-green-300' : ''}`}
                           >
                             <option value="">
                               {!formData.state 
@@ -550,6 +639,7 @@ const YieldPrediction = () => {
                             area: ''
                           });
                           setResult(null);
+                          setLocationAutoFilled({ state: false, district: false });
                         }} 
                         className="btn-secondary"
                       >
@@ -624,8 +714,15 @@ const YieldPrediction = () => {
                     <p className="text-gray-500 text-center text-sm mb-3">
                       Fill in the form and click "Predict Yield"
                     </p>
-                    <div className="p-3 bg-blue-100 border border-blue-300 rounded text-xs text-blue-800">
-                      💡 Select location manually or use the map to auto-fill state and district. Predictions are based on historical agricultural data.
+                    <div className="p-3 bg-blue-100 border border-blue-300 rounded text-xs text-blue-800 space-y-2">
+                      <div className="flex items-start">
+                        <span className="mr-1">📍</span>
+                        <p><strong>Quick Start:</strong> Click "Select from Map" or "Use My Location" to auto-fill State and District</p>
+                      </div>
+                      <div className="flex items-start">
+                        <span className="mr-1">💡</span>
+                        <p>Predictions are based on historical agricultural data using machine learning</p>
+                      </div>
                     </div>
                   </div>
                 )}

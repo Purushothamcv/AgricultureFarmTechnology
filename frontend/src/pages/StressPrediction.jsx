@@ -38,6 +38,8 @@ const StressPrediction = () => {
   const [showMap, setShowMap] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
+  const [soilDataFetched, setSoilDataFetched] = useState(false);
+  const [locationData, setLocationData] = useState(null);
 
   // Load dropdown options on mount
   useEffect(() => {
@@ -93,10 +95,16 @@ const StressPrediction = () => {
 
       if (response.data.success) {
         const data = response.data;
+        setLocationData(data);
         
-        // Auto-fill weather and location data
+        // Check if soil data was fetched
+        const hasSoilData = data.soil_pH || data.soil_moisture || data.elevation;
+        setSoilDataFetched(hasSoilData);
+        
+        // Auto-fill weather, location, and SOIL data
         setFormData(prev => ({
           ...prev,
+          // Weather data
           temperature: data.temperature?.toFixed(1) || prev.temperature,
           humidity: data.humidity?.toFixed(0) || prev.humidity,
           rainfall: data.rainfall?.toFixed(1) || prev.rainfall,
@@ -104,16 +112,32 @@ const StressPrediction = () => {
           elevation: data.elevation?.toString() || prev.elevation,
           water_flow: data.water_flow?.toString() || prev.water_flow,
           drainage: data.drainage?.toString() || prev.drainage,
+          // Soil data (NEW)
+          soil_moisture: data.soil_moisture?.toFixed(1) || prev.soil_moisture,
+          soil_ph: data.soil_pH?.toFixed(2) || prev.soil_ph,
+          organic_matter: data.organic_matter?.toFixed(2) || prev.organic_matter,
+          // Location
           lat: lat.toString(),
           lng: lng.toString()
         }));
 
         setShowMap(false);
-        alert(`Location data fetched!\nWeather data has been auto-filled.`);
+        
+        // Build notification
+        let notification = 'Location data fetched!\nWeather data has been auto-filled.';
+        if (hasSoilData) {
+          notification += '\n\n✅ Soil data also fetched!';
+          if (data.soil_pH) notification += `\nSoil pH: ${data.soil_pH}`;
+          if (data.soil_moisture) notification += `\nSoil Moisture: ${data.soil_moisture.toFixed(1)}%`;
+          if (data.elevation) notification += `\nElevation: ${data.elevation}m`;
+        }
+        
+        alert(notification);
       }
     } catch (err) {
       console.error('Error fetching location data:', err);
       alert('Failed to fetch location data. Please try again or enter manually.');
+      setSoilDataFetched(false);
     }
     setMapLoading(false);
   };

@@ -27,6 +27,8 @@ from yield_prediction_service import get_yield_service, startup_event as yield_s
 from fertilizer_prediction_service import get_fertilizer_service
 # Import Stress Prediction Service (Simplified Farmer-Friendly Model)
 from stress_prediction_service import stress_service
+# Import Soil Data Service (External API Integration for Map)
+from soil_data_service import get_soil_data_service
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 
@@ -676,8 +678,8 @@ def get_fertilizer_model_info():
 @app.post("/api/fertilizer/location-data")
 def get_fertilizer_location_data(data: dict):
     """
-    Get location and weather data for fertilizer recommendation based on coordinates
-    Uses reverse geocoding and weather APIs
+    Get location, weather, and SOIL data for fertilizer recommendation based on coordinates
+    Uses reverse geocoding, weather APIs, and SoilGrids API for comprehensive data
     """
     try:
         import requests
@@ -707,8 +709,34 @@ def get_fertilizer_location_data(data: dict):
             "district": None,
             "temperature": None,
             "humidity": None,
-            "rainfall": 0
+            "rainfall": 0,
+            # Soil characteristics
+            "soil_pH": None,
+            "soil_moisture": None,
+            "organic_matter": None,
+            "organic_carbon": None,
+            "soil_type": None,
+            "elevation": None,
+            "electrical_conductivity": None
         }
+        
+        # Fetch soil data from external APIs (SoilGrids, OpenElevation, etc.)
+        try:
+            print(f"🌍 Fetching soil data for coordinates: {lat}, {lng}")
+            soil_service = get_soil_data_service()
+            soil_data = soil_service.get_soil_data(lat, lng)
+            
+            # Merge soil data into result
+            if soil_data:
+                for key in ['soil_pH', 'soil_moisture', 'organic_matter', 'organic_carbon', 
+                           'soil_type', 'elevation', 'electrical_conductivity']:
+                    if soil_data.get(key) is not None:
+                        result[key] = soil_data[key]
+                
+                print(f"✅ Soil data fetched: pH={result['soil_pH']}, Type={result['soil_type']}, Elevation={result['elevation']}m")
+        except Exception as e:
+            print(f"⚠️ Failed to fetch soil data: {e}")
+            # Continue without soil data - user can enter manually
         
         # 1. Reverse Geocoding using Nominatim (OpenStreetMap)
         try:
@@ -807,6 +835,9 @@ def get_fertilizer_location_data(data: dict):
             import os
             weather_api_key = os.getenv('OPENWEATHER_API_KEY', '90e50f067196b6d46932c52869d83ed6')
             
+            print(f"🌤️  Attempting to fetch weather data for: {lat}, {lng}")
+            print(f"🔑 Using API key: {weather_api_key[:10]}...")
+            
             if weather_api_key:
                 weather_url = "https://api.openweathermap.org/data/2.5/weather"
                 weather_params = {
@@ -819,8 +850,10 @@ def get_fertilizer_location_data(data: dict):
                 weather_response = requests.get(
                     weather_url,
                     params=weather_params,
-                    timeout=5
+                    timeout=10
                 )
+                
+                print(f"🌐 Weather API Response Status: {weather_response.status_code}")
                 
                 if weather_response.status_code == 200:
                     weather_data = weather_response.json()
@@ -835,10 +868,17 @@ def get_fertilizer_location_data(data: dict):
                     rain_data = weather_data.get('rain', {})
                     result['rainfall'] = rain_data.get('1h', 0) or rain_data.get('3h', 0) or 0
                     
+                    print(f"✅ Weather data fetched: Temp={result['temperature']}°C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
+                else:
+                    print(f"❌ Weather API failed: Status {weather_response.status_code}")
+                    print(f"Response: {weather_response.text[:200]}")
+                    
         except requests.Timeout:
-            print("⚠️ Weather API timeout")
+            print("⚠️ Weather API timeout - request took longer than 10 seconds")
         except Exception as e:
             print(f"⚠️ Weather API error: {e}")
+            import traceback
+            traceback.print_exc()
         
         return result
         
@@ -897,7 +937,10 @@ def api_predict_stress(data: dict):
 
 @app.post("/api/stress/location-data")
 async def get_stress_location_data(data: dict):
-    """Fetch location and weather data for stress prediction"""
+    """
+    Fetch location, weather, and SOIL data for stress prediction
+    Enhanced with soil data from external APIs
+    """
     try:
         latitude = data.get('latitude')
         longitude = data.get('longitude')
@@ -908,29 +951,56 @@ async def get_stress_location_data(data: dict):
                 "error": "Latitude and longitude are required"
             }
         
-        # Fetch weather data
-        weather = fetch_weather_data(latitude, longitude)
+        lat = float(latitude)
+        lng = float(longitude)
         
-        if not weather:
-            return {
-                "success": False,
-                "error": "Failed to fetch weather data"
-            }
-        
-        # For simplicity, use default values for some fields
-        # In production, you'd fetch from actual APIs
-        return {
+        result = {
             "success": True,
-            "latitude": latitude,
-            "longitude": longitude,
-            "temperature": weather.get('temp', 25),
-            "humidity": weather.get('humidity', 60),
-            "rainfall": weather.get('rain', 50),
-            "wind_speed": weather.get('wind', 10),
-            "elevation": 500,  # Default, would need elevation API
+            "latitude": lat,
+            "longitude": lng,
+            "temperature": None,
+            "humidity": None,
+            "rainfall": None,
+            "wind_speed": None,
+            "elevation": None,
             "water_flow": 50,  # Default, would need sensor data
             "drainage": 70,    # Default, would need sensor data
+            # Soil data
+            "soil_pH": None,
+            "soil_moisture": None,
+            "organic_matter": None
         }
+        
+        # Fetch soil data from external APIs
+        try:
+            print(f"🌍 Fetching soil data for stress prediction: {lat}, {lng}")
+            soil_service = get_soil_data_service()
+            soil_data = soil_service.get_soil_data(lat, lng)
+            
+            if soil_data:
+                result["soil_pH"] = soil_data.get("soil_pH")
+                result["soil_moisture"] = soil_data.get("soil_moisture")
+                result["organic_matter"] = soil_data.get("organic_matter")
+                result["elevation"] = soil_data.get("elevation")
+                
+                print(f"✅ Soil data for stress: pH={result['soil_pH']}, Moisture={result['soil_moisture']}")
+        except Exception as e:
+            print(f"⚠️ Failed to fetch soil data for stress: {e}")
+        
+        # Fetch weather data
+        weather = fetch_weather_data(lat, lng)
+        
+        if weather:
+            result["temperature"] = weather.get('temp', 25)
+            result["humidity"] = weather.get('humidity', 60)
+            result["rainfall"] = weather.get('rain', 50)
+            result["wind_speed"] = weather.get('wind', 10)
+        
+        # If elevation not from soil data, use default
+        if result["elevation"] is None:
+            result["elevation"] = 500
+        
+        return result
         
     except Exception as e:
         print(f"❌ Location data error: {e}")

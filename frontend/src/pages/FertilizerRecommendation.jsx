@@ -46,6 +46,10 @@ const FertilizerRecommendation = () => {
   const [locationData, setLocationData] = useState(null);
   const [mapLoading, setMapLoading] = useState(false);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
+  const [loadingWeather, setLoadingWeather] = useState(false);
+  const [useMapData, setUseMapData] = useState(true); // Toggle for map vs manual
+  const [soilDataFetched, setSoilDataFetched] = useState(false); // Track if soil data was fetched
+  const [weatherDataFetched, setWeatherDataFetched] = useState(false); // Track if weather data was fetched
 
   // Load dropdown options on mount
   useEffect(() => {
@@ -104,6 +108,8 @@ const FertilizerRecommendation = () => {
     });
     setResult(null);
     setLocationData(null);
+    setWeatherDataFetched(false);
+    setSoilDataFetched(false);
   };
 
   const handleMapLocationSelect = async (lat, lng) => {
@@ -116,35 +122,93 @@ const FertilizerRecommendation = () => {
 
       if (response.data.success) {
         const data = response.data;
+        
+        // Debug: Log received data
+        console.log('📊 Received location data:', {
+          temperature: data.temperature,
+          humidity: data.humidity,
+          rainfall: data.rainfall,
+          soil_pH: data.soil_pH,
+          soil_type: data.soil_type
+        });
+        
         setLocationData(data);
 
-        // Autofill form with location and weather data
+        // Build notification message
+        let notificationParts = [`📍 Location detected!`];
+        if (data.state || data.district) {
+          notificationParts.push(`State: ${data.state || 'N/A'}, District: ${data.district || 'N/A'}`);
+        }
+        
+        // Check if weather data was fetched
+        const hasWeatherData = data.temperature !== null && data.temperature !== undefined || 
+                               data.humidity !== null && data.humidity !== undefined || 
+                               data.rainfall !== null && data.rainfall !== undefined;
+        if (hasWeatherData) {
+          notificationParts.push(`\n✅ Weather data: ${data.temperature?.toFixed(1) || 'N/A'}°C, ${data.humidity?.toFixed(0) || 'N/A'}% humidity`);
+          setWeatherDataFetched(true);
+        } else {
+          setWeatherDataFetched(false);
+        }
+        
+        // Check if soil data was fetched
+        const hasSoilData = data.soil_pH || data.soil_type || data.elevation;
+        if (hasSoilData) {
+          notificationParts.push(`✅ Soil data: pH ${data.soil_pH || 'N/A'}, Type: ${data.soil_type || 'N/A'}`);
+          setSoilDataFetched(true);
+        } else {
+          notificationParts.push(`⚠️ Soil data unavailable - please enter manually`);
+          setSoilDataFetched(false);
+        }
+
+        // Autofill form with location, weather, AND soil data
+        // For number inputs, keep values as numbers (not strings) for proper display
         setFormData(prev => ({
           ...prev,
-          Region: data.region || prev.Region,
-          Temperature: data.temperature?.toFixed(1) || prev.Temperature,
-          Humidity: data.humidity?.toFixed(0) || prev.Humidity,
-          Rainfall: data.rainfall?.toFixed(1) || prev.Rainfall
+          // Location & Weather - Keep as numbers for number inputs
+          Region: data.region !== undefined && data.region !== null ? data.region : prev.Region,
+          Temperature: data.temperature !== undefined && data.temperature !== null ? String(data.temperature) : prev.Temperature,
+          Humidity: data.humidity !== undefined && data.humidity !== null ? String(data.humidity) : prev.Humidity,
+          Rainfall: data.rainfall !== undefined && data.rainfall !== null ? String(data.rainfall) : prev.Rainfall,
+          
+          // Soil Characteristics - Keep as numbers
+          Soil_Type: data.soil_type || prev.Soil_Type,
+          Soil_pH: data.soil_pH !== undefined && data.soil_pH !== null ? String(data.soil_pH) : prev.Soil_pH,
+          Soil_Moisture: data.soil_moisture !== undefined && data.soil_moisture !== null ? String(data.soil_moisture) : prev.Soil_Moisture,
+          Organic_Carbon: data.organic_carbon !== undefined && data.organic_carbon !== null ? String(data.organic_carbon) : prev.Organic_Carbon,
+          Electrical_Conductivity: data.electrical_conductivity !== undefined && data.electrical_conductivity !== null ? String(data.electrical_conductivity) : prev.Electrical_Conductivity
         }));
+        
+        console.log('✅ Form data updated with fetched values');
 
         setShowMap(false);
-        alert(`Location detected!\nState: ${data.state || 'N/A'}\nDistrict: ${data.district || 'N/A'}\nRegion: ${data.region || 'N/A'}`);
+        alert(notificationParts.join('\n'));
       }
     } catch (err) {
       console.error('Error fetching location data:', err);
       alert('Failed to fetch location data. Please try again or enter manually.');
+      setSoilDataFetched(false);
     }
     setMapLoading(false);
   };
 
   const handleResetLocation = () => {
     setLocationData(null);
+    setSoilDataFetched(false);
+    setWeatherDataFetched(false);
     setFormData(prev => ({
       ...prev,
+      // Clear location & weather data
       Region: '',
       Temperature: '',
       Humidity: '',
-      Rainfall: ''
+      Rainfall: '',
+      // Clear soil data
+      Soil_Type: '',
+      Soil_pH: '',
+      Soil_Moisture: '',
+      Organic_Carbon: '',
+      Electrical_Conductivity: ''
     }));
   };
 
@@ -186,6 +250,87 @@ const FertilizerRecommendation = () => {
         
         alert(errorMessage);
         setLoadingCurrentLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  // Auto-fill ONLY weather data (Temperature, Humidity, Rainfall)
+  const autoFillWeatherData = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLoadingWeather(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('🌤️ Fetching weather for location:', latitude, longitude);
+        
+        try {
+          // Fetch weather data from Open-Meteo API directly
+          const weatherResponse = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto`
+          );
+          
+          if (!weatherResponse.ok) {
+            throw new Error('Failed to fetch weather data');
+          }
+          
+          const weatherData = await weatherResponse.json();
+          const current = weatherData.current;
+          
+          // Extract weather values
+          const temperature = current.temperature_2m || 0;
+          const humidity = current.relative_humidity_2m || 0;
+          const rainfall = current.precipitation || 0;
+          
+          console.log('✅ Weather data fetched:', { temperature, humidity, rainfall });
+          
+          // Update only Temperature, Humidity, and Rainfall fields
+          setFormData(prev => ({
+            ...prev,
+            Temperature: String(temperature),
+            Humidity: String(humidity),
+            Rainfall: String(rainfall)
+          }));
+          
+          setWeatherDataFetched(true);
+          
+          alert(`✅ Weather Data Auto-Filled!\n\n🌡️ Temperature: ${temperature.toFixed(1)}°C\n💧 Humidity: ${humidity.toFixed(0)}%\n🌧️ Rainfall: ${rainfall.toFixed(1)}mm\n\nYou can modify these values if needed.`);
+        } catch (error) {
+          console.error('Error fetching weather:', error);
+          alert('Failed to fetch weather data. Please try again or enter manually.');
+        }
+        
+        setLoadingWeather(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        let errorMessage = 'Could not get your location. ';
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Please allow location access in your browser.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'An unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        setLoadingWeather(false);
       },
       {
         enableHighAccuracy: true,
@@ -276,7 +421,7 @@ const FertilizerRecommendation = () => {
                     
                     {locationData ? (
                       <div className="bg-white p-3 rounded border border-blue-300">
-                        <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
                           <div>
                             <span className="text-gray-600">State:</span>
                             <span className="font-medium ml-2">{locationData.state || 'N/A'}</span>
@@ -290,12 +435,74 @@ const FertilizerRecommendation = () => {
                             <span className="font-medium ml-2">{locationData.region || 'N/A'}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Weather:</span>
-                            <span className="font-medium ml-2">
-                              {locationData.temperature ? `${locationData.temperature.toFixed(1)}°C, ${locationData.humidity?.toFixed(0)}%` : 'N/A'}
+                            <span className="text-gray-600">Lat/Lng:</span>
+                            <span className="font-medium ml-2 text-xs">
+                              {locationData.latitude?.toFixed(3)}, {locationData.longitude?.toFixed(3)}
                             </span>
                           </div>
                         </div>
+                        
+                        {weatherDataFetched && (
+                          <div className="pt-2 border-t border-blue-200 mb-2">
+                            <div className="flex items-center mb-1">
+                              <span className="text-xs text-blue-600 font-semibold">✅ Weather Data Fetched</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              {locationData.temperature && (
+                                <div>
+                                  <span className="text-gray-600">Temp:</span>
+                                  <span className="font-medium ml-1">{locationData.temperature.toFixed(1)}°C</span>
+                                </div>
+                              )}
+                              {locationData.humidity && (
+                                <div>
+                                  <span className="text-gray-600">Humidity:</span>
+                                  <span className="font-medium ml-1">{locationData.humidity.toFixed(0)}%</span>
+                                </div>
+                              )}
+                              {locationData.rainfall !== undefined && (
+                                <div>
+                                  <span className="text-gray-600">Rainfall:</span>
+                                  <span className="font-medium ml-1">{locationData.rainfall.toFixed(1)}mm</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {soilDataFetched && (
+                          <div className="pt-2 border-t border-green-200">
+                            <div className="flex items-center mb-1">
+                              <span className="text-xs text-green-600 font-semibold">✅ Soil Data Fetched</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {locationData.soil_type && (
+                                <div>
+                                  <span className="text-gray-600">Type:</span>
+                                  <span className="font-medium ml-1">{locationData.soil_type}</span>
+                                </div>
+                              )}
+                              {locationData.soil_pH && (
+                                <div>
+                                  <span className="text-gray-600">pH:</span>
+                                  <span className="font-medium ml-1">{locationData.soil_pH}</span>
+                                </div>
+                              )}
+                              {locationData.elevation && (
+                                <div>
+                                  <span className="text-gray-600">Elevation:</span>
+                                  <span className="font-medium ml-1">{locationData.elevation}m</span>
+                                </div>
+                              )}
+                              {locationData.soil_moisture && (
+                                <div>
+                                  <span className="text-gray-600">Moisture:</span>
+                                  <span className="font-medium ml-1">{locationData.soil_moisture.toFixed(1)}%</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex gap-2">
@@ -334,19 +541,33 @@ const FertilizerRecommendation = () => {
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                       <div className="w-2 h-6 bg-primary-600 mr-2"></div>
                       Soil Characteristics
+                      {soilDataFetched && (
+                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          📍 Auto-filled from map
+                        </span>
+                      )}
                     </h3>
+                    
+                    {soilDataFetched && (
+                      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                        <span className="font-medium">✓ Soil data loaded from location.</span> You can still modify any values manually if needed.
+                      </div>
+                    )}
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Soil Type <span className="text-red-500">*</span>
+                          {locationData?.soil_type && formData.Soil_Type === locationData.soil_type && (
+                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          )}
                         </label>
                         <select
                           name="Soil_Type"
                           value={formData.Soil_Type}
                           onChange={handleChange}
                           required
-                          className="input-field"
+                          className={`input-field ${locationData?.soil_type && formData.Soil_Type === locationData.soil_type ? 'bg-green-50 border-green-300' : ''}`}
                         >
                           <option value="">Select soil type</option>
                           {options.Soil_Type?.map(type => (
@@ -355,57 +576,89 @@ const FertilizerRecommendation = () => {
                         </select>
                       </div>
                       
-                      <InputField
-                        label="Soil pH"
-                        name="Soil_pH"
-                        type="number"
-                        value={formData.Soil_pH}
-                        onChange={handleChange}
-                        placeholder="4.0 - 9.0"
-                        required
-                        min="4"
-                        max="9"
-                        step="0.1"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Soil pH <span className="text-red-500">*</span>
+                          {locationData?.soil_pH && (
+                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          )}
+                        </label>
+                        <input
+                          type="number"
+                          name="Soil_pH"
+                          value={formData.Soil_pH}
+                          onChange={handleChange}
+                          placeholder="4.0 - 9.0"
+                          required
+                          min="4"
+                          max="9"
+                          step="0.1"
+                          className={`input-field ${locationData?.soil_pH ? 'bg-green-50 border-green-300' : ''}`}
+                        />
+                      </div>
                       
-                      <InputField
-                        label="Soil Moisture (%)"
-                        name="Soil_Moisture"
-                        type="number"
-                        value={formData.Soil_Moisture}
-                        onChange={handleChange}
-                        placeholder="0 - 100"
-                        required
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Soil Moisture (%) <span className="text-red-500">*</span>
+                          {locationData?.soil_moisture && (
+                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          )}
+                        </label>
+                        <input
+                          type="number"
+                          name="Soil_Moisture"
+                          value={formData.Soil_Moisture}
+                          onChange={handleChange}
+                          placeholder="0 - 100"
+                          required
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          className={`input-field ${locationData?.soil_moisture ? 'bg-green-50 border-green-300' : ''}`}
+                        />
+                      </div>
                       
-                      <InputField
-                        label="Organic Carbon (%)"
-                        name="Organic_Carbon"
-                        type="number"
-                        value={formData.Organic_Carbon}
-                        onChange={handleChange}
-                        placeholder="0 - 5"
-                        required
-                        min="0"
-                        max="5"
-                        step="0.01"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Organic Carbon (%) <span className="text-red-500">*</span>
+                          {locationData?.organic_carbon && (
+                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          )}
+                        </label>
+                        <input
+                          type="number"
+                          name="Organic_Carbon"
+                          value={formData.Organic_Carbon}
+                          onChange={handleChange}
+                          placeholder="0 - 5"
+                          required
+                          min="0"
+                          max="5"
+                          step="0.01"
+                          className={`input-field ${locationData?.organic_carbon ? 'bg-green-50 border-green-300' : ''}`}
+                        />
+                      </div>
                       
-                      <InputField
-                        label="Electrical Conductivity (dS/m)"
-                        name="Electrical_Conductivity"
-                        type="number"
-                        value={formData.Electrical_Conductivity}
-                        onChange={handleChange}
-                        placeholder="0 - 4"
-                        required
-                        min="0"
-                        max="4"
-                        step="0.01"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Electrical Conductivity (dS/m) <span className="text-red-500">*</span>
+                          {locationData?.electrical_conductivity && (
+                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          )}
+                        </label>
+                        <input
+                          type="number"
+                          name="Electrical_Conductivity"
+                          value={formData.Electrical_Conductivity}
+                          onChange={handleChange}
+                          placeholder="0 - 4"
+                          required
+                          min="0"
+                          max="4"
+                          step="0.01"
+                          className={`input-field ${locationData?.electrical_conductivity ? 'bg-green-50 border-green-300' : ''}`}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -524,14 +777,57 @@ const FertilizerRecommendation = () => {
 
                   {/* Environmental Factors */}
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                      <div className="w-2 h-6 bg-blue-600 mr-2"></div>
-                      Environmental Conditions
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <div className="w-2 h-6 bg-blue-600 mr-2"></div>
+                        Environmental Conditions
+                        {weatherDataFetched && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            🌤️ Auto-filled
+                          </span>
+                        )}
+                      </h3>
+                      
+                      {/* Auto-Fill Weather Button */}
+                      <button
+                        type="button"
+                        onClick={autoFillWeatherData}
+                        disabled={loadingWeather}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg text-sm font-medium shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingWeather ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Fetching...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            <span>Auto-Fill Weather</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {weatherDataFetched && (
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                        <span className="font-medium">✓ Weather data loaded automatically.</span> You can still modify any values manually if needed.
+                      </div>
+                    )}
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <InputField
-                        label="Temperature (°C)"
+                        label={
+                          <span>
+                            Temperature (°C)
+                            {weatherDataFetched && (
+                              <span className="ml-1 text-xs text-blue-600">🌤️ Auto-filled</span>
+                            )}
+                          </span>
+                        }
                         name="Temperature"
                         type="number"
                         value={formData.Temperature}
@@ -541,10 +837,18 @@ const FertilizerRecommendation = () => {
                         min="0"
                         max="50"
                         step="0.1"
+                        className={weatherDataFetched ? 'bg-blue-50 border-blue-300' : ''}
                       />
                       
                       <InputField
-                        label="Humidity (%)"
+                        label={
+                          <span>
+                            Humidity (%)
+                            {weatherDataFetched && (
+                              <span className="ml-1 text-xs text-blue-600">🌤️ Auto-filled</span>
+                            )}
+                          </span>
+                        }
                         name="Humidity"
                         type="number"
                         value={formData.Humidity}
@@ -554,10 +858,18 @@ const FertilizerRecommendation = () => {
                         min="0"
                         max="100"
                         step="0.1"
+                        className={weatherDataFetched ? 'bg-blue-50 border-blue-300' : ''}
                       />
                       
                       <InputField
-                        label="Rainfall (mm)"
+                        label={
+                          <span>
+                            Rainfall (mm)
+                            {weatherDataFetched && (
+                              <span className="ml-1 text-xs text-blue-600">🌤️ Auto-filled</span>
+                            )}
+                          </span>
+                        }
                         name="Rainfall"
                         type="number"
                         value={formData.Rainfall}
@@ -567,6 +879,7 @@ const FertilizerRecommendation = () => {
                         min="0"
                         max="1000"
                         step="0.1"
+                        className={weatherDataFetched ? 'bg-blue-50 border-blue-300' : ''}
                       />
                     </div>
                   </div>
@@ -618,13 +931,16 @@ const FertilizerRecommendation = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Region <span className="text-red-500">*</span>
+                          {locationData?.region && formData.Region === locationData.region && (
+                            <span className="ml-1 text-xs text-purple-600">📍</span>
+                          )}
                         </label>
                         <select
                           name="Region"
                           value={formData.Region}
                           onChange={handleChange}
                           required
-                          className="input-field"
+                          className={`input-field ${locationData?.region && formData.Region === locationData.region ? 'bg-purple-50 border-purple-300' : ''}`}
                         >
                           <option value="">Select region</option>
                           {options.Region?.map(region => (
@@ -742,9 +1058,16 @@ const FertilizerRecommendation = () => {
                   <div className="card bg-gray-50">
                     <div className="text-center py-8">
                       <Droplet className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-gray-500 text-sm mb-4">
                         Fill in all soil, crop, and environmental details to get ML-powered fertilizer recommendations
                       </p>
+                      <div className="bg-blue-100 border border-blue-300 rounded-lg p-3 text-left text-xs text-blue-800 space-y-2">
+                        <p className="font-semibold flex items-center">
+                          <Sparkles className="w-4 h-4 mr-1" />
+                          Quick Tip:
+                        </p>
+                        <p>Click the <strong>"Auto-Fill Weather"</strong> button to automatically populate Temperature, Humidity, and Rainfall with real-time data!</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -810,44 +1133,58 @@ const MapSelector = ({ onLocationSelect, onClose, loading }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="p-3 md:p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-primary-600" />
-            <h3 className="text-lg font-semibold text-gray-800">Select Location on Map</h3>
+            <MapPin className="w-4 h-4 md:w-5 md:h-5 mr-2 text-primary-600" />
+            <h3 className="text-base md:text-lg font-semibold text-gray-800">Select Location</h3>
           </div>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
             disabled={loading}
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 md:w-6 md:h-6" />
           </button>
         </div>
         
-        <div className="p-4">
+        <div className="p-3 md:p-4 overflow-y-auto flex-1">
+          <div className="mb-3 p-2 md:p-3 bg-blue-50 border border-blue-200 rounded text-xs md:text-sm text-blue-800">
+            <p className="font-medium mb-1">📍 Click on the map to select a location</p>
+            <p className="text-xs">Fetches soil, weather, and location data automatically.</p>
+          </div>
+          
           <div 
             id="fertilizer-map" 
-            style={{ height: '500px', width: '100%' }}
+            style={{ height: 'min(400px, 50vh)', width: '100%' }}
             className="rounded-lg border border-gray-300"
           ></div>
           
           {selectedPos && (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm">
-              <span className="font-medium text-gray-700">Selected Location:</span>{' '}
+            <div className="mt-2 md:mt-3 p-2 md:p-3 bg-blue-50 rounded-lg text-xs md:text-sm">
+              <span className="font-medium text-gray-700">Selected:</span>{' '}
               <span className="text-gray-600">
-                Latitude: {selectedPos.lat.toFixed(5)}, Longitude: {selectedPos.lng.toFixed(5)}
+                {selectedPos.lat.toFixed(4)}, {selectedPos.lng.toFixed(4)}
               </span>
+            </div>
+          )}
+          
+          {loading && (
+            <div className="mt-2 md:mt-3 p-2 md:p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs md:text-sm">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
+                <span className="text-yellow-800">Fetching data...</span>
+              </div>
             </div>
           )}
         </div>
         
-        <div className="p-4 border-t border-gray-200 flex gap-3">
+        <div className="p-3 md:p-4 border-t border-gray-200 flex gap-2 md:gap-3 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary flex-1"
+            className="btn-secondary flex-1 text-sm md:text-base"
             disabled={loading}
           >
             Cancel
@@ -855,10 +1192,24 @@ const MapSelector = ({ onLocationSelect, onClose, loading }) => {
           <button
             type="button"
             onClick={handleConfirm}
-            className="btn-primary flex-1"
+            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
             disabled={!selectedPos || loading}
           >
-            {loading ? 'Fetching Location Data...' : 'Confirm Location'}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="hidden md:inline">Fetching Data...</span>
+                <span className="md:hidden">Loading...</span>
+              </span>
+            ) : (
+              <>
+                <span className="hidden md:inline">Confirm & Fetch Data</span>
+                <span className="md:hidden">Confirm</span>
+              </>
+            )}
           </button>
         </div>
       </div>
