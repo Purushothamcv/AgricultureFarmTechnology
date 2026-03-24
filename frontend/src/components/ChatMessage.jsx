@@ -1,7 +1,9 @@
 import React from 'react';
 import { User, Bot } from 'lucide-react';
 
-const ChatMessage = ({ message, isUser }) => {
+const ChatMessage = ({ message, isUser, timestamp }) => {
+  const resolvedTime = timestamp ? new Date(timestamp) : new Date();
+
   return (
     <div className={`flex items-start space-x-3 mb-4 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
@@ -22,7 +24,7 @@ const ChatMessage = ({ message, isUser }) => {
           <p className="text-sm whitespace-pre-wrap break-words">{message}</p>
         </div>
         <span className="text-xs text-gray-500 mt-1 block">
-          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {resolvedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
     </div>

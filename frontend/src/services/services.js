@@ -185,8 +185,8 @@ export const diseaseService = {
 };
 
 export const chatbotService = {
-  async sendMessage(message) {
-    const response = await api.post('/chatbot/message', { message });
+  async sendMessage(payload) {
+    const response = await api.post('/chat/send', payload);
     return response.data;
   }
 };

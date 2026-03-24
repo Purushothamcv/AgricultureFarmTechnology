@@ -23,6 +23,8 @@ from plant_disease_service import router as plant_disease_router, startup_event 
 from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
 # Import Yield Prediction Service (APY Dataset-based)
 from yield_prediction_service import get_yield_service, startup_event as yield_startup
+# Import Agentic AI Crop Service
+from agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
 # Import Fertilizer Prediction Service (Dataset-based ML)
 from fertilizer_prediction_service import get_fertilizer_service
 # Import Stress Prediction Service (Simplified Farmer-Friendly Model)
@@ -31,6 +33,7 @@ from stress_prediction_service import stress_service
 from soil_data_service import get_soil_data_service
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
+app.add_event_handler("startup", agentic_ai_startup)
 
 # Event handlers for MongoDB connection
 @app.on_event("startup")
@@ -77,7 +80,7 @@ async def startup_event():
         await yield_startup()
     except Exception as e:
         print(f"⚠️  Yield service failed to start: {e}")
-    
+
     try:
         print("🌱 Initializing Fertilizer Prediction Service...")
         fertilizer_service = get_fertilizer_service()
@@ -128,6 +131,7 @@ app.include_router(chatbot_router)  # AI Chatbot with voice assistance
 app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
 app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
 app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
+app.include_router(agentic_router)  # Agentic AI crop fetching
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -461,10 +465,11 @@ def api_predict_yield(data: dict):
     # Predict yield
     try:
         prediction = yield_model.predict(features)[0]
-        yield_value = round(float(prediction), 2)
+        yield_value = round(max(float(prediction), 0.0), 2)
     except Exception as e:
         # Fallback calculation if model fails
-        yield_value = round(float(area) * (30 + (temp * 0.5) + (rain * 0.3)), 2)
+        fallback_prediction = float(area) * (30 + (temp * 0.5) + (rain * 0.3))
+        yield_value = round(max(fallback_prediction, 0.0), 2)
     
     return {
         "yield": f"{yield_value} tonnes/hectare",
@@ -575,6 +580,36 @@ async def get_yield_districts_by_state(state: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load districts: {str(e)}")
+
+
+@app.get("/yield/crops/{state}")
+async def get_yield_crops_by_state(state: str):
+    """
+    Get crops filtered by selected state.
+
+    Args:
+        state: State name to filter crops
+
+    Returns:
+        Unique crops for the selected state sorted alphabetically
+    """
+    try:
+        service = get_yield_service()
+        print(f"🌾 API request /yield/crops/{{state}} => {state}")
+        crops = service.get_crops_by_state(state)
+        print(f"🌾 API response crop count => {len(crops)}")
+
+        if not crops:
+            return {
+                "crops": [],
+                "message": "No crops found for this state"
+            }
+
+        return {
+            "crops": crops
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load crops: {str(e)}")
 
 
 @app.get("/api/yield/model-info")
@@ -1103,4 +1138,9 @@ def api_chatbot(data: dict):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=port)

@@ -12,12 +12,15 @@ Features:
 
 import os
 import json
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from uuid import uuid4
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 from groq import Groq
 import logging
 from dotenv import load_dotenv
+from database import get_database
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "llama-3.3-70b-versatile"  # Updated to current Groq model (Jan 2026)
+CHAT_SESSIONS_COLLECTION = "chatbot"
+MAX_CONTEXT_MESSAGES = 20
+MAX_STORED_MESSAGES = 50
 
 # Initialize Groq client
 groq_client = None
@@ -79,17 +85,65 @@ When user requests Kannada language:
 class ChatMessage(BaseModel):
     role: str  # 'user' or 'assistant'
     content: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StoredChatSession(BaseModel):
+    user_id: str
+    session_id: str
+    messages: List[ChatMessage] = Field(default_factory=list)
 
 class ChatRequest(BaseModel):
     message: str
     language: str = "english"  # 'english', 'hindi', or 'kannada'
-    conversation_history: List[ChatMessage] = []
+    conversation_history: List[ChatMessage] = Field(default_factory=list)
     context: Optional[str] = None  # Additional context (crop name, disease, etc.)
 
 class ChatResponse(BaseModel):
     response: str
     language: str
     conversation_id: Optional[str] = None
+
+
+class NewSessionRequest(BaseModel):
+    user_id: str
+
+
+class NewSessionResponse(BaseModel):
+    user_id: str
+    session_id: str
+
+
+class SendMessageRequest(BaseModel):
+    user_id: str
+    session_id: str
+    message: str
+    language: str = "english"
+    context: Optional[str] = None
+
+
+class SendMessageResponse(BaseModel):
+    response: str
+
+
+class SessionHistoryResponse(BaseModel):
+    user_id: str
+    session_id: str
+    messages: List[ChatMessage]
+
+
+class ChatSessionSummary(BaseModel):
+    session_id: str
+    title: str
+    preview: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int
+
+
+class SessionListResponse(BaseModel):
+    user_id: str
+    sessions: List[ChatSessionSummary]
 
 # ============================================================================
 # GROQ CLIENT INITIALIZATION
@@ -149,6 +203,138 @@ def format_conversation_history(history: List[ChatMessage]) -> List[Dict]:
         List of message dictionaries
     """
     return [{"role": msg.role, "content": msg.content} for msg in history]
+
+
+def get_chat_collection():
+    """Get MongoDB collection for chatbot sessions."""
+    db = get_database()
+    return db[CHAT_SESSIONS_COLLECTION]
+
+
+def trim_history_for_context(history: List[ChatMessage], max_messages: int = MAX_CONTEXT_MESSAGES) -> List[ChatMessage]:
+    """Keep only the last N messages to avoid token overflow."""
+    if max_messages <= 0:
+        return []
+    return history[-max_messages:]
+
+
+def trim_history_for_storage(history: List[ChatMessage], max_messages: int = MAX_STORED_MESSAGES) -> List[ChatMessage]:
+    """Keep stored session history bounded for scalability."""
+    if max_messages <= 0:
+        return []
+    return history[-max_messages:]
+
+
+def normalize_stored_messages(raw_messages: List[Dict]) -> List[ChatMessage]:
+    """Convert MongoDB message documents to ChatMessage objects."""
+    normalized: List[ChatMessage] = []
+    for msg in raw_messages or []:
+        role = msg.get("role")
+        content = msg.get("content")
+        timestamp = msg.get("timestamp")
+        if role in {"user", "assistant"} and isinstance(content, str):
+            if not isinstance(timestamp, datetime):
+                timestamp = datetime.now(timezone.utc)
+            normalized.append(ChatMessage(role=role, content=content, timestamp=timestamp))
+    return normalized
+
+
+def build_session_title_from_messages(messages: List[ChatMessage]) -> str:
+    """Generate a concise title from the first user message."""
+    first_user_message = next((m.content.strip() for m in messages if m.role == "user" and m.content.strip()), "")
+    if not first_user_message:
+        return "New Chat"
+    words = first_user_message.split()
+    return " ".join(words[:8]) + ("..." if len(words) > 8 else "")
+
+
+def build_session_preview(messages: List[ChatMessage]) -> str:
+    """Build sidebar preview from the latest message."""
+    if not messages:
+        return "No messages yet"
+    latest = messages[-1].content.strip()
+    if len(latest) > 80:
+        return latest[:80] + "..."
+    return latest
+
+
+def build_session_summary(session: Dict) -> ChatSessionSummary:
+    """Convert a MongoDB session document into sidebar metadata."""
+    messages = normalize_stored_messages(session.get("messages", []))
+    created_at = session.get("created_at")
+    updated_at = session.get("updated_at")
+    if not isinstance(created_at, datetime):
+        created_at = datetime.now(timezone.utc)
+    if not isinstance(updated_at, datetime):
+        updated_at = datetime.now(timezone.utc)
+
+    title = session.get("title") or build_session_title_from_messages(messages)
+    return ChatSessionSummary(
+        session_id=session.get("session_id", ""),
+        title=title,
+        preview=build_session_preview(messages),
+        created_at=created_at,
+        updated_at=updated_at,
+        message_count=len(messages),
+    )
+
+
+async def create_chat_session(user_id: str) -> str:
+    """Create a new chat session for a user."""
+    collection = get_chat_collection()
+    session_id = str(uuid4())
+    await collection.insert_one(
+        {
+            "user_id": user_id,
+            "session_id": session_id,
+            "title": "New Chat",
+            "messages": [],
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }
+    )
+    return session_id
+
+
+async def get_chat_session(session_id: str) -> Optional[Dict]:
+    """Fetch a session document by session_id."""
+    collection = get_chat_collection()
+    return await collection.find_one({"session_id": session_id}, {"_id": 0})
+
+
+async def ensure_session_owner(session_id: str, user_id: str) -> Dict:
+    """Ensure a session exists and belongs to the requesting user."""
+    session = await get_chat_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Session does not belong to this user")
+    return session
+
+
+async def append_messages_to_session(session_id: str, messages: List[ChatMessage]) -> None:
+    """Append new chat messages and keep storage bounded."""
+    collection = get_chat_collection()
+    session = await get_chat_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    current_messages = normalize_stored_messages(session.get("messages", []))
+    updated = trim_history_for_storage(current_messages + messages)
+    computed_title = session.get("title") or "New Chat"
+    if computed_title == "New Chat":
+        computed_title = build_session_title_from_messages(updated)
+
+    await collection.update_one(
+        {"session_id": session_id},
+        {
+            "$set": {
+                "title": computed_title,
+                "messages": [m.model_dump() for m in updated],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
 
 async def get_ai_response(
     message: str,
@@ -215,9 +401,97 @@ async def get_ai_response(
 # FASTAPI ROUTER
 # ============================================================================
 
-router = APIRouter(prefix="/chatbot", tags=["AI Chatbot"])
+router = APIRouter(tags=["AI Chatbot"])
 
-@router.post("/chat", response_model=ChatResponse)
+
+@router.post("/chat/new-session", response_model=NewSessionResponse)
+async def new_session(request: NewSessionRequest):
+    """Create and return a fresh session_id for the given user."""
+    try:
+        session_id = await create_chat_session(request.user_id)
+        return NewSessionResponse(user_id=request.user_id, session_id=session_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat session creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create chat session")
+
+
+@router.get("/chat/history/{session_id}", response_model=SessionHistoryResponse)
+async def get_history(session_id: str, user_id: Optional[str] = Query(default=None)):
+    """Return full chat history for a session."""
+    try:
+        session = await get_chat_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        if user_id and session.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Session does not belong to this user")
+
+        return SessionHistoryResponse(
+            user_id=session.get("user_id", ""),
+            session_id=session_id,
+            messages=normalize_stored_messages(session.get("messages", [])),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat history retrieval error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch chat history")
+
+
+@router.get("/chat/sessions/{user_id}", response_model=SessionListResponse)
+async def list_user_sessions(user_id: str, limit: int = Query(default=20, ge=1, le=100)):
+    """Return recent chat sessions for sidebar rendering."""
+    try:
+        collection = get_chat_collection()
+        cursor = (
+            collection.find({"user_id": user_id}, {"_id": 0})
+            .sort("updated_at", -1)
+            .limit(limit)
+        )
+        sessions = await cursor.to_list(length=limit)
+        summaries = [build_session_summary(session) for session in sessions]
+        return SessionListResponse(user_id=user_id, sessions=summaries)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat sessions list error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch chat sessions")
+
+
+@router.post("/chat/send", response_model=SendMessageResponse)
+async def send_message(request: SendMessageRequest):
+    """Send a user message using persistent conversation memory."""
+    try:
+        session = await ensure_session_owner(request.session_id, request.user_id)
+        full_history = normalize_stored_messages(session.get("messages", []))
+        context_history = trim_history_for_context(full_history)
+
+        assistant_text = await get_ai_response(
+            message=request.message,
+            language=request.language,
+            conversation_history=context_history,
+            context=request.context,
+        )
+
+        now = datetime.now(timezone.utc)
+        await append_messages_to_session(
+            request.session_id,
+            [
+                ChatMessage(role="user", content=request.message, timestamp=now),
+                ChatMessage(role="assistant", content=assistant_text, timestamp=now),
+            ],
+        )
+
+        return SendMessageResponse(response=assistant_text)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Persistent chat send error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send message")
+
+@router.post("/chatbot/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
     Chat with AI assistant
@@ -266,7 +540,7 @@ async def chat(request: ChatRequest):
         logger.error(f"❌ Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/health")
+@router.get("/chat/health")
 async def health_check():
     """Health check endpoint"""
     return {
@@ -276,7 +550,13 @@ async def health_check():
         "supported_languages": ["english", "kannada"]
     }
 
-@router.post("/translate")
+
+@router.get("/chatbot/health")
+async def legacy_health_check():
+    """Backward-compatible chatbot health endpoint."""
+    return await health_check()
+
+@router.post("/chat/translate")
 async def translate_text(text: str, from_lang: str, to_lang: str):
     """
     Translate text between English and Kannada
@@ -305,6 +585,12 @@ async def translate_text(text: str, from_lang: str, to_lang: str):
         logger.error(f"❌ Translation error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/chatbot/translate")
+async def legacy_translate_text(text: str, from_lang: str, to_lang: str):
+    """Backward-compatible chatbot translation endpoint."""
+    return await translate_text(text=text, from_lang=from_lang, to_lang=to_lang)
+
 # ============================================================================
 # STARTUP EVENT
 # ============================================================================
@@ -314,6 +600,13 @@ async def startup_event():
     try:
         logger.info("🤖 Initializing AI Chatbot Service...")
         initialize_groq_client()
+
+        # Ensure session indexes exist for fast and scalable history lookups.
+        collection = get_chat_collection()
+        await collection.create_index("session_id", unique=True)
+        await collection.create_index("user_id")
+        await collection.create_index([("user_id", 1), ("updated_at", -1)])
+
         logger.info("✅ AI Chatbot Service initialized successfully!")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chatbot service: {str(e)}")

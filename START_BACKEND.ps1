@@ -39,6 +39,6 @@ Write-Host "      Press Ctrl+C to stop the server" -ForegroundColor Gray
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Start the server (this will block and show all output)
-python -m uvicorn ultra_minimal_auth:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main_fastapi:app --host 0.0.0.0 --port 8000 --reload
 
 Write-Host "`nServer stopped." -ForegroundColor Yellow

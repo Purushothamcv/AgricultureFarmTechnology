@@ -56,9 +56,22 @@ class YieldModelTrainer:
         self.df = self.df.dropna(subset=['Yield'])
         print(f"  - Removed {original_count - len(self.df):,} rows with null Yield")
         
-        # Drop rows with zero or negative yield
-        self.df = self.df[self.df['Yield'] > 0]
-        print(f"  - Kept only positive yields: {len(self.df):,} rows remaining")
+        # Remove negative yield rows to guarantee non-negative target values.
+        before_negative_filter = len(self.df)
+        self.df = self.df[self.df['Yield'] >= 0]
+        print(f"  - Removed {before_negative_filter - len(self.df):,} rows with negative Yield")
+
+        # Remove extreme outliers from target with IQR method while preserving valid domain.
+        q1 = self.df['Yield'].quantile(0.25)
+        q3 = self.df['Yield'].quantile(0.75)
+        iqr = q3 - q1
+        upper_bound = q3 + (1.5 * iqr)
+        lower_bound = max(0.0, q1 - (1.5 * iqr))
+
+        before_outlier_filter = len(self.df)
+        self.df = self.df[(self.df['Yield'] >= lower_bound) & (self.df['Yield'] <= upper_bound)]
+        print(f"  - Removed {before_outlier_filter - len(self.df):,} Yield outliers (IQR method)")
+        print(f"  - Yield bounds after cleaning: {lower_bound:.2f} to {upper_bound:.2f}")
         
         # IMPORTANT: Do NOT use Production as feature (data leakage prevention)
         # Since Yield = Production / Area, using Production would leak the target
@@ -213,7 +226,10 @@ class YieldModelTrainer:
                 'rmse': float(xgb_rmse),
                 'mae': float(xgb_mae),
                 'train_samples': len(X_train),
-                'test_samples': len(X_test)
+                'test_samples': len(X_test),
+                'yield_min': float(y.min()),
+                'yield_max': float(y.max()),
+                'yield_p99': float(y.quantile(0.99))
             }
         else:
             print(f"\n✅ Selected: RandomForest (better R² score)")
@@ -224,7 +240,10 @@ class YieldModelTrainer:
                 'rmse': float(rf_rmse),
                 'mae': float(rf_mae),
                 'train_samples': len(X_train),
-                'test_samples': len(X_test)
+                'test_samples': len(X_test),
+                'yield_min': float(y.min()),
+                'yield_max': float(y.max()),
+                'yield_p99': float(y.quantile(0.99))
             }
         
         return X_train, X_test, y_train, y_test

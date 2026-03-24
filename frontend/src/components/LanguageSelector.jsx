@@ -120,7 +120,7 @@ const LanguageSelector = ({ currentLanguage, onLanguageChange }) => {
       )}
 
       {/* CSS Animation */}
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from {
             opacity: 0;

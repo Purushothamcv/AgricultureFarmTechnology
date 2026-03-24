@@ -6,8 +6,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { cropService } from '../services/services';
 import { TrendingUp, MapPin, Calendar, Sprout, Map } from 'lucide-react';
 
-// Use environment variable or fallback to localhost:8001
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+// Use environment variable or fallback to localhost:8000
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const YieldPrediction = () => {
   const [formData, setFormData] = useState({
@@ -28,8 +28,11 @@ const YieldPrediction = () => {
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingCrops, setLoadingCrops] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [cropInfoMessage, setCropInfoMessage] = useState('');
   const [locationAutoFilled, setLocationAutoFilled] = useState({
     state: false,
     district: false
@@ -40,15 +43,17 @@ const YieldPrediction = () => {
     loadOptions();
   }, []);
 
-  // Load districts when state changes
+  // Load districts and agentic crops when state/district changes
   useEffect(() => {
     if (formData.state) {
       loadDistrictsByState(formData.state);
+      loadCropsByState(formData.state, formData.district);
     } else {
       // Reset districts when no state is selected
-      setOptions(prev => ({ ...prev, districts: [] }));
+      setOptions(prev => ({ ...prev, districts: [], crops: [] }));
+      setCropInfoMessage('');
     }
-  }, [formData.state]);
+  }, [formData.state, formData.district]);
 
   const loadOptions = async () => {
     try {
@@ -64,17 +69,16 @@ const YieldPrediction = () => {
         console.log('✅ Loaded states:', data.states?.length);
       }
 
-      // Load crops and seasons separately
+      // Load seasons (crop list is state-dependent and loaded on state selection)
       const optionsResponse = await fetch(`${API_URL}/api/yield/options`);
       const optionsData = await optionsResponse.json();
       
       if (optionsData.success) {
         setOptions(prev => ({
           ...prev,
-          crops: optionsData.crops || [],
           seasons: optionsData.seasons || []
         }));
-        console.log('✅ Loaded crops and seasons');
+        console.log('✅ Loaded seasons');
       }
     } catch (err) {
       console.error('Error loading options:', err);
@@ -103,8 +107,57 @@ const YieldPrediction = () => {
     }
   };
 
+  const loadCropsByState = async (state, district = '') => {
+    try {
+      setLoadingCrops(true);
+      setCropInfoMessage('');
+      const query = new URLSearchParams({ state });
+      if (district) {
+        query.set('district', district);
+      }
+
+      const agentResponse = await fetch(`${API_URL}/agent/crops?${query.toString()}`);
+      const agentData = await agentResponse.json();
+      console.log('Crops API:', agentData);
+
+      if (!agentResponse.ok) {
+        throw new Error(agentData?.detail || 'Agentic API failed');
+      }
+
+      const crops = Array.isArray(agentData?.crops) ? agentData.crops : [];
+      setOptions(prev => ({ ...prev, crops }));
+      if (crops.length === 0) {
+        setCropInfoMessage(agentData?.message || 'No crops available');
+      }
+
+      console.log(`✅ Loaded ${crops.length} agentic crops for ${state}${district ? `, ${district}` : ''}`);
+    } catch (err) {
+      console.error('Agentic crop fetch failed, falling back to dataset filter:', err);
+
+      try {
+        const fallbackResponse = await fetch(`${API_URL}/yield/crops/${encodeURIComponent(state)}`);
+        const fallbackData = await fallbackResponse.json();
+        console.log('🌾 Fallback crop API response:', fallbackData);
+
+        const fallbackCrops = Array.isArray(fallbackData?.crops) ? fallbackData.crops : [];
+        setOptions(prev => ({ ...prev, crops: fallbackCrops }));
+
+        if (fallbackCrops.length === 0) {
+          setCropInfoMessage(fallbackData?.message || 'No crops available');
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback crop fetch failed:', fallbackErr);
+        setOptions(prev => ({ ...prev, crops: [] }));
+        setCropInfoMessage('No crops available');
+      }
+    } finally {
+      setLoadingCrops(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+    setFormError('');
     
     // Clear auto-fill indicator when user manually changes
     if (name === 'state' || name === 'district') {
@@ -116,8 +169,11 @@ const YieldPrediction = () => {
       setFormData({
         ...formData,
         state: value,
-        district: '' // Clear district when state changes
+        district: '', // Clear district when state changes
+        crop: '' // Clear crop when state changes
       });
+      setOptions(prev => ({ ...prev, crops: [] }));
+      setCropInfoMessage('');
       setLocationAutoFilled(prev => ({ ...prev, district: false }));
     } else {
       setFormData({
@@ -186,7 +242,8 @@ const YieldPrediction = () => {
           setFormData(prev => ({
             ...prev,
             state: matchingState,
-            district: '' // Clear district initially
+            district: '', // Clear district initially
+            crop: ''
           }));
           setLocationAutoFilled(prev => ({ ...prev, state: true, district: false }));
           
@@ -235,17 +292,33 @@ const YieldPrediction = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const parsedArea = parseFloat(formData.area);
+    const parsedYear = parseInt(formData.year, 10);
+    const currentYear = new Date().getFullYear();
+
+    if (Number.isNaN(parsedArea) || parsedArea <= 0) {
+      setFormError('Area must be greater than 0');
+      return;
+    }
+
+    if (Number.isNaN(parsedYear) || parsedYear < 1900 || parsedYear > currentYear) {
+      setFormError(`Year must be between 1900 and ${currentYear}`);
+      return;
+    }
+
     setLoading(true);
     setResult(null);
+    setFormError('');
 
     try {
       const payload = {
         state: formData.state,
         district: formData.district,
         crop: formData.crop,
-        year: parseInt(formData.year),
+        year: parsedYear,
         season: formData.season,
-        area: parseFloat(formData.area)
+        area: parsedArea
       };
 
       console.log('📤 Sending yield prediction request:', payload);
@@ -264,18 +337,18 @@ const YieldPrediction = () => {
       if (data.success) {
         setResult(data);
       } else {
-        throw new Error(data.error || 'Prediction failed');
+        throw new Error(data.error || data.detail || 'Prediction failed');
       }
     } catch (err) {
       console.error('Error:', err);
-      alert(`Prediction failed: ${err.message}`);
+      setFormError(`Prediction failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 30 }, (_, i) => currentYear - 10 + i);
+  const years = Array.from({ length: 31 }, (_, i) => currentYear - i);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -425,6 +498,12 @@ const YieldPrediction = () => {
                   <LoadingSpinner text="Loading options..." />
                 ) : (
                   <form onSubmit={handleSubmit}>
+                    {formError && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded text-sm text-red-700">
+                        {formError}
+                      </div>
+                    )}
+
                     {/* Location Section */}
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-3">
@@ -556,13 +635,25 @@ const YieldPrediction = () => {
                             value={formData.crop}
                             onChange={handleChange}
                             required
+                            disabled={!formData.state || loadingCrops}
                             className="input-field"
                           >
-                            <option value="">Select Crop</option>
+                            <option value="">
+                              {!formData.state
+                                ? 'Select a state first'
+                                : loadingCrops
+                                ? 'Loading crops...'
+                                : 'Select Crop'}
+                            </option>
                             {options.crops.map(crop => (
                               <option key={crop} value={crop}>{crop}</option>
                             ))}
                           </select>
+                          {formData.state && options.crops.length === 0 && !loadingCrops && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              {cropInfoMessage || 'No crops available'}
+                            </p>
+                          )}
                         </div>
 
                         <div>
@@ -669,9 +760,14 @@ const YieldPrediction = () => {
                       <div className="mb-4">
                         <div className="text-sm text-gray-600 mb-1">Predicted Yield</div>
                         <div className="text-3xl font-bold text-green-700">
-                          {result.predicted_yield}
+                          {Number(result.predicted_yield).toFixed(2)}
                         </div>
                         <div className="text-sm text-gray-500">{result.unit}</div>
+                        {result.was_corrected && (
+                          <div className="text-xs text-green-700 mt-1">
+                            Adjusted to a realistic non-negative value
+                          </div>
+                        )}
                       </div>
 
                       <div className="mb-4">
@@ -684,6 +780,12 @@ const YieldPrediction = () => {
 
                       <div className="pt-3 border-t border-gray-300">
                         <div className="text-xs text-gray-600 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Source:</span>
+                            <span className="font-semibold">
+                              {result.source === 'dataset_fallback' ? 'Based on Historical Data' : 'Model Prediction'}
+                            </span>
+                          </div>
                           <div className="flex justify-between">
                             <span>Model Confidence (R²):</span>
                             <span className="font-semibold">

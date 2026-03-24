@@ -14,26 +14,58 @@ import React, { useState, useRef, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import ChatMessage from '../components/ChatMessage';
 import LanguageSelector from '../components/LanguageSelector';
-import { MessageCircle, Mic, MicOff, Volume2, VolumeX, Send, Trash2, Loader, Bot } from 'lucide-react';
+import api from '../services/api';
+import { MessageCircle, Mic, MicOff, Volume2, VolumeX, Send, Plus, Loader, Bot } from 'lucide-react';
 
-// Use environment variable or fallback to localhost:8001
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+// Use the same backend base URL used by other modules/services.
+const API_URL = (api.defaults.baseURL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API_FALLBACK_URL = API_URL.includes('localhost:8001')
+  ? API_URL.replace('localhost:8001', 'localhost:8000')
+  : (API_URL.includes('localhost:8000') ? API_URL.replace('localhost:8000', 'localhost:8001') : null);
+const API_CANDIDATES = API_FALLBACK_URL ? [API_URL, API_FALLBACK_URL] : [API_URL];
+const CHAT_USER_STORAGE_KEY = 'smartagri_chat_user_id';
+const CHAT_SESSION_STORAGE_KEY = 'smartagri_chat_session_id';
+
+const DEFAULT_WELCOME_MESSAGE = {
+  text: "Hello! I'm SmartAgri AI Assistant. I can help you with crops, diseases, fertilizers, and farming advice. How can I assist you today?",
+  isUser: false,
+  timestamp: new Date().toISOString()
+};
+
+const createClientId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `u_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+};
+
+const chatbotFetch = async (path, options = {}) => {
+  let lastError = null;
+
+  for (const baseUrl of API_CANDIDATES) {
+    try {
+      return await fetch(`${baseUrl}${path}`, options);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Failed to connect to backend');
+};
 
 const Chatbot = () => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
   
-  const [messages, setMessages] = useState([
-    {
-      text: "Hello! I'm SmartAgri AI Assistant. I can help you with crops, diseases, fertilizers, and farming advice. How can I assist you today?",
-      isUser: false,
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([DEFAULT_WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState('english'); // 'english', 'hindi', or 'kannada'
+  const [userId, setUserId] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [sessionList, setSessionList] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   
   // Voice states
   const [isListening, setIsListening] = useState(false);
@@ -44,6 +76,91 @@ const Chatbot = () => {
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
   const synthesisRef = useRef(null);
+
+  const mapApiMessagesToUi = (history = []) => {
+    const mapped = history
+      .filter((msg) => msg?.content && (msg.role === 'user' || msg.role === 'assistant'))
+      .map((msg) => ({
+        text: msg.content,
+        isUser: msg.role === 'user',
+        timestamp: msg.timestamp || new Date().toISOString()
+      }));
+
+    return mapped.length > 0 ? mapped : [DEFAULT_WELCOME_MESSAGE];
+  };
+
+  const formatSessionTime = (isoString) => {
+    if (!isoString) return '';
+    const time = new Date(isoString);
+    if (Number.isNaN(time.getTime())) return '';
+    return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const loadSessionList = async (activeUserId, preferredSessionId = null) => {
+    if (!activeUserId) return;
+
+    const response = await chatbotFetch(`/chat/sessions/${encodeURIComponent(activeUserId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load sessions (${response.status})`);
+    }
+
+    const data = await response.json();
+    const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    setSessionList(sessions);
+
+    if (preferredSessionId && sessions.some((session) => session.session_id === preferredSessionId)) {
+      setSessionId(preferredSessionId);
+    }
+  };
+
+  const fetchAndRenderHistory = async (activeSessionId, activeUserId, showLoadingState = false) => {
+    if (showLoadingState) {
+      setHistoryLoading(true);
+    }
+
+    try {
+      const response = await chatbotFetch(`/chat/history/${activeSessionId}?user_id=${encodeURIComponent(activeUserId)}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load chat history (${response.status})`);
+      }
+
+      const data = await response.json();
+      setMessages(mapApiMessagesToUi(data.messages));
+    } finally {
+      if (showLoadingState) {
+        setHistoryLoading(false);
+      }
+    }
+  };
+
+  const createNewSession = async (activeUserId, shouldResetUi = true) => {
+    const response = await chatbotFetch('/chat/new-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ user_id: activeUserId })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create new session (${response.status})`);
+    }
+
+    const data = await response.json();
+    const nextSessionId = data.session_id;
+    localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId);
+    setSessionId(nextSessionId);
+
+    if (shouldResetUi) {
+      setMessages([DEFAULT_WELCOME_MESSAGE]);
+      setInputMessage('');
+      if (synthesisRef.current) {
+        synthesisRef.current.cancel();
+      }
+    }
+
+    return nextSessionId;
+  };
 
   // ============================================================================
   // VOICE RECOGNITION SETUP (Web Speech API)
@@ -98,6 +215,34 @@ const Chatbot = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const initializeChatSession = async () => {
+      let activeUserId = localStorage.getItem(CHAT_USER_STORAGE_KEY);
+      if (!activeUserId) {
+        activeUserId = createClientId();
+        localStorage.setItem(CHAT_USER_STORAGE_KEY, activeUserId);
+      }
+      setUserId(activeUserId);
+
+      try {
+        const existingSessionId = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+        if (existingSessionId) {
+          setSessionId(existingSessionId);
+          await fetchAndRenderHistory(existingSessionId, activeUserId);
+          await loadSessionList(activeUserId, existingSessionId);
+        } else {
+          const createdSessionId = await createNewSession(activeUserId, true);
+          await loadSessionList(activeUserId, createdSessionId);
+        }
+      } catch (error) {
+        console.error('Failed to initialize chat session:', error);
+        setMessages([DEFAULT_WELCOME_MESSAGE]);
+      }
+    };
+
+    initializeChatSession();
+  }, []);
   
   // ============================================================================
   // VOICE FUNCTIONS
@@ -150,18 +295,72 @@ const Chatbot = () => {
     setLanguage(newLanguage);
   };
   
-  const clearChat = () => {
-    setMessages([
-      {
-        text: "Chat cleared. How can I assist you?",
-        isUser: false,
-        timestamp: new Date()
-      }
-    ]);
-    setInputMessage('');
-    if (synthesisRef.current) {
-      synthesisRef.current.cancel();
+  const startNewChat = async () => {
+    if (!userId || loading) return;
+
+    try {
+      setLoading(true);
+      const createdSessionId = await createNewSession(userId, true);
+      await loadSessionList(userId, createdSessionId);
+    } catch (error) {
+      console.error('Failed to create new chat session:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: 'Unable to create a new chat right now. Please try again.',
+          isUser: false,
+          timestamp: new Date().toISOString()
+        }
+      ]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const switchToSession = async (targetSessionId) => {
+    if (!targetSessionId || !userId || targetSessionId === sessionId || loading) return;
+
+    try {
+      setSessionId(targetSessionId);
+      localStorage.setItem(CHAT_SESSION_STORAGE_KEY, targetSessionId);
+      await fetchAndRenderHistory(targetSessionId, userId, true);
+    } catch (error) {
+      console.error('Failed to switch chat session:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: 'Unable to load selected chat. Please try again.',
+          isUser: false,
+          timestamp: new Date().toISOString()
+        }
+      ]);
+    }
+  };
+
+  const sendLegacyChatMessage = async (messageText) => {
+    const response = await chatbotFetch('/chatbot/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: messageText,
+        language,
+        conversation_history: messages.map((m) => ({
+          role: m.isUser ? 'user' : 'assistant',
+          content: m.text,
+          timestamp: m.timestamp,
+        })),
+        context: null,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Legacy chat failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response;
   };
 
   const handleSend = async () => {
@@ -170,7 +369,7 @@ const Chatbot = () => {
     const userMessage = {
       text: inputMessage,
       isUser: true,
-      timestamp: new Date()
+      timestamp: new Date().toISOString()
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -178,40 +377,60 @@ const Chatbot = () => {
     setLoading(true);
 
     try {
-      // Call Groq AI backend
-      const response = await fetch(`${API_URL}/chatbot/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage.text,
-          language: language,
-          conversation_history: messages.map(m => ({
-            role: m.isUser ? 'user' : 'assistant',
-            content: m.text
-          })),
-          context: null
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let assistantResponse = '';
+      let activeSessionId = sessionId;
+
+      if (userId && !activeSessionId) {
+        try {
+          activeSessionId = await createNewSession(userId, false);
+          await loadSessionList(userId, activeSessionId);
+        } catch (sessionError) {
+          console.warn('Session creation failed, falling back to legacy chat:', sessionError);
+        }
       }
-      
-      const data = await response.json();
-      
+
+      if (userId && activeSessionId) {
+        try {
+          const response = await chatbotFetch('/chat/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              session_id: activeSessionId,
+              message: userMessage.text,
+              language,
+              context: null
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          assistantResponse = data.response;
+          await loadSessionList(userId, activeSessionId);
+        } catch (persistentError) {
+          console.warn('Persistent chat failed, falling back to legacy chat:', persistentError);
+          assistantResponse = await sendLegacyChatMessage(userMessage.text);
+        }
+      } else {
+        assistantResponse = await sendLegacyChatMessage(userMessage.text);
+      }
+
       const botMessage = {
-        text: data.response,
+        text: assistantResponse,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       };
       
       setMessages(prev => [...prev, botMessage]);
       
       // Speak the response if voice is enabled
       if (voiceEnabled) {
-        speakText(data.response);
+        speakText(assistantResponse);
       }
       
     } catch (error) {
@@ -220,7 +439,7 @@ const Chatbot = () => {
       const botMessage = {
         text: "Sorry, I encountered an error. Please try again.",
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       };
       
       setMessages(prev => [...prev, botMessage]);
@@ -291,27 +510,74 @@ const Chatbot = () => {
                   {voiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
                 </button>
                 
-                {/* Clear Chat */}
+                {/* New Chat */}
                 <button
-                  onClick={clearChat}
-                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                  title="Clear Chat"
+                  onClick={startNewChat}
+                  disabled={loading || !userId}
+                  className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="New Chat"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Chat Container */}
-          <div className="card h-[500px] flex flex-col">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Chat History Sidebar */}
+            <div className="card lg:col-span-1 h-[500px] flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-700">Chat History</h2>
+                <button
+                  onClick={startNewChat}
+                  disabled={loading || !userId}
+                  className="p-1.5 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="New Chat"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {sessionList.length === 0 && (
+                  <p className="text-xs text-gray-500">No previous chats yet.</p>
+                )}
+
+                {sessionList.map((session) => {
+                  const isActiveSession = session.session_id === sessionId;
+                  return (
+                    <button
+                      key={session.session_id}
+                      onClick={() => switchToSession(session.session_id)}
+                      className={`w-full text-left p-2 rounded-lg border transition-colors ${
+                        isActiveSession
+                          ? 'border-blue-300 bg-blue-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-gray-800 truncate">{session.title || 'New Chat'}</p>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{session.preview || 'No messages yet'}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{formatSessionTime(session.updated_at)}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Chat Container */}
+            <div className="card h-[500px] flex flex-col lg:col-span-3">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {historyLoading && (
+                <div className="text-sm text-gray-500">Loading chat history...</div>
+              )}
+
               {messages.map((message, index) => (
                 <ChatMessage
                   key={index}
                   message={message.text}
                   isUser={message.isUser}
+                  timestamp={message.timestamp}
                 />
               ))}
               
@@ -406,6 +672,7 @@ const Chatbot = () => {
                 <span>{messages.length} messages</span>
               </div>
             </div>
+          </div>
           </div>
 
 {/* Feature Info */}

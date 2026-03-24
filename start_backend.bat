@@ -22,6 +22,6 @@ echo Backend is running. Press Ctrl+C to stop.
 echo ========================================
 echo.
 
-python -m uvicorn ultra_minimal_auth:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main_fastapi:app --host 0.0.0.0 --port 8000 --reload
 
 pause
