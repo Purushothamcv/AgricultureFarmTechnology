@@ -65,7 +65,9 @@ HINDI_INSTRUCTIONS = """
 When user requests Hindi language:
 - Provide responses in Hindi (हिंदी)
 - Use simple, farmer-friendly language (सरल भाषा)
-- Include both Hindi and English technical terms in parentheses for clarity
+- IMPORTANT: Use only Hindi words and Devanagari script for the full response
+- Do not mix English words, transliterations, or bilingual parentheses
+- If an agricultural term is technical, explain it in pure Hindi instead of English
 - Use Devanagari script
 - Be culturally appropriate for Hindi-speaking farmers across India
 """
@@ -74,8 +76,17 @@ KANNADA_INSTRUCTIONS = """
 When user requests Kannada language:
 - Provide responses in Kannada (ಕನ್ನಡ)
 - Use simple, farmer-friendly language
-- Include both Kannada and English technical terms in parentheses for clarity
+- IMPORTANT: Use only Kannada words and Kannada script for the full response
+- Do not mix English words, transliterations, or bilingual parentheses
+- If an agricultural term is technical, explain it in pure Kannada instead of English
 - Be culturally appropriate for Karnataka farmers
+"""
+
+ENGLISH_INSTRUCTIONS = """
+When user requests English language:
+- Provide responses only in English
+- Do not mix Hindi, Kannada, or other language words/scripts
+- Keep wording simple, clear, and farmer-friendly
 """
 
 # ============================================================================
@@ -186,6 +197,8 @@ def build_system_prompt(language: str, context: Optional[str] = None) -> str:
         base_prompt += "\n\n" + HINDI_INSTRUCTIONS
     elif language == "kannada":
         base_prompt += "\n\n" + KANNADA_INSTRUCTIONS
+    else:
+        base_prompt += "\n\n" + ENGLISH_INSTRUCTIONS
     
     if context:
         base_prompt += f"\n\nCurrent Context: {context}"
