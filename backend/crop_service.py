@@ -216,6 +216,44 @@ def get_soil_data_by_region(latitude: float, longitude: float) -> Dict[str, floa
     return default_soil
 
 
+async def fetch_weather_and_ph_only(latitude: float, longitude: float) -> Dict[str, Any]:
+    """
+    Fetch ONLY weather and soil pH data for a given location
+    
+    NPK values are intentionally NOT included as they must come from user's soil test.
+    
+    Args:
+        latitude: Latitude coordinate
+        longitude: Longitude coordinate
+    
+    Returns:
+        Dictionary with weather and pH data only (NO NPK values)
+    """
+    # Fetch weather data
+    weather_data = await fetch_weather_data(latitude, longitude)
+    
+    # Get soil data (to extract pH only)
+    soil_data = get_soil_data_by_region(latitude, longitude)
+    
+    # Combine data - ONLY weather and pH, NO NPK
+    location_data = {
+        "success": weather_data.get("success", True),
+        "latitude": latitude,
+        "longitude": longitude,
+        "temperature": weather_data["temperature"],
+        "humidity": weather_data["humidity"],
+        "rainfall": weather_data["rainfall"],
+        "ph": soil_data["ph"],
+        "ozone": weather_data.get("ozone", 35.0),  # Default ozone if not in weather_data
+        "message": "Weather and pH data fetched successfully (NPK must be entered from soil test)"
+    }
+    
+    if not weather_data.get("success"):
+        location_data["message"] = "Weather API unavailable, using default values (NPK values must be entered manually)"
+    
+    return location_data
+
+
 async def fetch_all_location_data(latitude: float, longitude: float) -> Dict[str, Any]:
     """
     Fetch both weather and soil data for a given location

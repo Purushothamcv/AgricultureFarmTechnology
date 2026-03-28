@@ -46,51 +46,52 @@ const ResultCard = ({ result, type = 'success', title = 'Result', icon: CustomIc
   if (!result) return null;
 
   return (
-    <div className={`card border-2 ${config.border} ${config.bg}`}>
-      <div className="flex items-start space-x-3">
-        <Icon className={`w-6 h-6 ${config.iconColor} flex-shrink-0 mt-1`} />
-        <div className="flex-1">
-          <h3 className={`text-lg font-semibold ${config.text} mb-2`}>{title}</h3>
-          {typeof result === 'string' ? (
-            <p className={`${config.text} text-base`}>{result}</p>
-          ) : typeof result === 'object' ? (
-            <div className="space-y-3">
-              {Object.entries(result).map(([key, value]) => {
-                // Skip fields that are internal or should be displayed separately
-                const skipFields = [
-                  'warnings', 'hasWarnings', 'actionRequired', 'interpretation', 
-                  'top3', 'alternatives', 'fullClass', 'class', 'prediction'
-                ];
-                if (skipFields.includes(key)) {
-                  return null;
-                }
-                // Skip rendering if value is an object or array
-                if (typeof value === 'object' && value !== null) {
-                  return null;
-                }
-                
-                // Format the display value (already clean from backend)
-                let displayValue = value;
-                
-                return (
-                  <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className={`${config.text} font-medium capitalize min-w-[100px] flex-shrink-0`}>
-                      {key.replace(/_/g, ' ')}:
-                    </span>
-                    <span className={`${config.text} font-semibold flex-1 break-words`}>
-                      {typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <pre className={`${config.text} text-sm whitespace-pre-wrap`}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          )}
-        </div>
+    <div className={`border-2 ${config.border} ${config.bg} rounded-lg p-5 w-full max-w-2xl`}>
+      {/* Header with Icon and Title */}
+      <div className="flex items-center gap-3 mb-4">
+        <Icon className={`w-6 h-6 ${config.iconColor} flex-shrink-0`} />
+        <h3 className={`text-lg font-semibold ${config.text}`}>{title}</h3>
       </div>
+
+      {/* Content */}
+      {typeof result === 'string' ? (
+        <p className={`${config.text} text-base whitespace-normal`}>{result}</p>
+      ) : typeof result === 'object' ? (
+        <div className="flex flex-col gap-3">
+          {Object.entries(result).map(([key, value]) => {
+            // Skip fields that are internal or should be displayed separately
+            const skipFields = [
+              'warnings', 'hasWarnings', 'actionRequired', 'interpretation', 
+              'top3', 'alternatives', 'fullClass', 'class', 'prediction'
+            ];
+            if (skipFields.includes(key)) {
+              return null;
+            }
+            // Skip rendering if value is an object or array
+            if (typeof value === 'object' && value !== null) {
+              return null;
+            }
+            
+            // Format the display value (already clean from backend)
+            let displayValue = value;
+            
+            return (
+              <div key={key} className="flex justify-between items-flex-start gap-3">
+                <span className={`${config.text} font-semibold capitalize flex-shrink-0 min-w-[120px]`}>
+                  {key.replace(/_/g, ' ')}:
+                </span>
+                <span className={`${config.text} text-right flex-1 whitespace-normal break-words leading-relaxed`}>
+                  {typeof displayValue === 'number' ? displayValue.toFixed(2) : displayValue}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <pre className={`${config.text} text-sm whitespace-pre-wrap overflow-auto max-h-96`}>
+          {JSON.stringify(result, null, 2)}
+        </pre>
+      )}
     </div>
   );
 };

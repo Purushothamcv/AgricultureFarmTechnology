@@ -4,6 +4,7 @@ Handles user registration, login with JWT tokens, and Google OAuth
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import bcrypt
 from datetime import datetime, timedelta
@@ -12,8 +13,10 @@ from jose import JWTError, jwt
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import os
+import urllib.parse
 from models import UserRegister, UserLogin, UserResponse, LoginResponse, MessageResponse, GoogleAuthRequest, TokenResponse
-from database import get_database
+# Import from central MongoDB Atlas connection
+from db import users_collection
 
 # Initialize router
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -26,6 +29,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Google OAuth Configuration (set in .env file)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
@@ -111,9 +117,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 @router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(user_data: UserRegister, db=Depends(get_database)):
+def register_user(user_data: UserRegister):
     """
-    Register a new user
+    Register a new user with MongoDB Atlas
     
     - **name**: User's full name (2-100 characters)
     - **email**: Valid email address (must be unique)
@@ -124,13 +130,14 @@ async def register_user(user_data: UserRegister, db=Depends(get_database)):
     
     Raises:
         HTTPException: 400 if email already exists
+        HTTPException: 503 if MongoDB connection fails
     """
     
-    print(f"[REGISTER] Registration attempt - Name: {user_data.name}, Email: {user_data.email}")
+    print(f"\n[REGISTER] Registration attempt - Name: {user_data.name}, Email: {user_data.email}")
     
     try:
         # Check if user with email already exists
-        existing_user = await db.users.find_one({"email": user_data.email})
+        existing_user = users_collection.find_one({"email": user_data.email})
         if existing_user:
             print(f"[REGISTER] ERROR: Email {user_data.email} already exists")
             raise HTTPException(
@@ -139,7 +146,7 @@ async def register_user(user_data: UserRegister, db=Depends(get_database)):
             )
         
         # Hash the password
-        print(f"[REGISTER] Hashing password for {user_data.email}...")
+        print(f"[REGISTER] Hashing password...")
         hashed_password = hash_password(user_data.password)
         
         # Prepare user document for MongoDB
@@ -152,40 +159,41 @@ async def register_user(user_data: UserRegister, db=Depends(get_database)):
             "last_login": None
         }
         
-        # Insert user into database
-        print(f"[REGISTER] Inserting user {user_data.email} into database...")
-        result = await db.users.insert_one(user_document)
+        # Insert user into MongoDB Atlas
+        print(f"[REGISTER] Inserting user {user_data.email} into MongoDB Atlas...")
+        result = users_collection.insert_one(user_document)
         
-        if result.inserted_id:
-            print(f"[REGISTER] SUCCESS: User {user_data.email} registered with ID: {result.inserted_id}")
-            return MessageResponse(
-                message=f"User '{user_data.name}' registered successfully! Please login to continue."
-            )
-        else:
-            print(f"[REGISTER] ERROR: No inserted_id returned")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to register user. Please try again."
-            )
+        print(f"[REGISTER] ✅ SUCCESS: User {user_data.email} registered with ID: {result.inserted_id}")
+        return MessageResponse(
+            message=f"User '{user_data.name}' registered successfully! Please login to continue."
+        )
             
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        print(f"[REGISTER] ERROR for {user_data.email}: {str(e)}")
-        print(f"   Error type: {type(e).__name__}")
-        import traceback
-        print(f"   Traceback: {traceback.format_exc()}")
+        error_str = str(e).lower()
+        print(f"[REGISTER] ERROR: {str(e)}")
+        
+        # Handle MongoDB connection errors gracefully
+        if "ssl" in error_str or "connection" in error_str or "handshake" in error_str:
+            print(f"[REGISTER] ERROR: MongoDB connection failed")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service temporarily unavailable. Please check your network connection or try again later."
+            )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}"
+            detail="Registration service error. Please try again."
         )
 
 
+
 @router.post("/login", response_model=TokenResponse)
-async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
+def login_user(user_credentials: UserLogin):
     """
-    Authenticate user and return JWT token
+    Authenticate user and return JWT token using MongoDB Atlas
     
     - **email**: User's registered email address
     - **password**: User's password
@@ -195,13 +203,14 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
     
     Raises:
         HTTPException: 401 if credentials are invalid
+        HTTPException: 503 if MongoDB connection fails
     """
     
     print(f"\n[LOGIN] Login attempt for email: {user_credentials.email}")
     
     try:
-        # Find user by email
-        user = await db.users.find_one({"email": user_credentials.email})
+        # Find user by email in MongoDB Atlas
+        user = users_collection.find_one({"email": user_credentials.email})
         
         if not user:
             print(f"[LOGIN] FAILED: User not found for email {user_credentials.email}")
@@ -225,8 +234,8 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
         
         print(f"[LOGIN] Password verified successfully ✓")
         
-        # Update last_login timestamp
-        await db.users.update_one(
+        # Update last_login timestamp in MongoDB Atlas
+        users_collection.update_one(
             {"_id": user["_id"]},
             {"$set": {"last_login": datetime.utcnow()}}
         )
@@ -247,8 +256,7 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
             "role": user.get("role", "user")
         }
         
-        print(f"[LOGIN] SUCCESS: Token generated for user: {user_info['email']}")
-        print(f"   User info: {user_info}\n")
+        print(f"[LOGIN] ✅ SUCCESS: Token generated for user: {user_info['email']}")
         
         return TokenResponse(
             message="Login successful",
@@ -261,21 +269,29 @@ async def login_user(user_credentials: UserLogin, db=Depends(get_database)):
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        print(f"[LOGIN] ERROR for {user_credentials.email}: {str(e)}")
-        print(f"   Error type: {type(e).__name__}")
-        import traceback
-        print(f"   Traceback: {traceback.format_exc()}")
+        error_str = str(e).lower()
+        print(f"[LOGIN] ERROR: {str(e)}")
+        
+        # Handle MongoDB connection errors gracefully
+        if "ssl" in error_str or "connection" in error_str or "handshake" in error_str:
+            print(f"[LOGIN] ERROR: MongoDB connection failed")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service temporarily unavailable. Please check your network connection or try again later."
+            )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Authentication error: {str(e)}"
+            detail="Authentication service error. Please try again."
         )
 
 
 
+
 @router.post("/google", response_model=TokenResponse)
-async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
+def google_auth(auth_data: GoogleAuthRequest):
     """
-    Authenticate user with Google OAuth
+    Authenticate user with Google OAuth using MongoDB Atlas
     
     - **credential**: Google ID token from Google Sign-In
     
@@ -284,12 +300,13 @@ async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
     
     Raises:
         HTTPException: 401 if Google token is invalid
+        HTTPException: 503 if MongoDB connection fails
     """
     
     print(f"\n[GOOGLE AUTH] Google OAuth login attempt")
     
     try:
-        # Verify Google ID token
+        # Verify Google OAuth is configured
         if not GOOGLE_CLIENT_ID:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -317,11 +334,11 @@ async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
         
         print(f"[GOOGLE AUTH] Google token verified for: {email}")
         
-        # Check if user exists
-        user = await db.users.find_one({"email": email})
+        # Check if user exists in MongoDB Atlas
+        user = users_collection.find_one({"email": email})
         
         if not user:
-            # Create new user with Google account
+            # Create new user with Google account in MongoDB Atlas
             print(f"[GOOGLE AUTH] Creating new user for Google account: {email}")
             user_document = {
                 "name": name,
@@ -333,13 +350,13 @@ async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
                 "created_at": datetime.utcnow(),
                 "last_login": datetime.utcnow()
             }
-            result = await db.users.insert_one(user_document)
-            user = await db.users.find_one({"_id": result.inserted_id})
-            print(f"[GOOGLE AUTH] New user created with ID: {result.inserted_id}")
+            result = users_collection.insert_one(user_document)
+            user = users_collection.find_one({"_id": result.inserted_id})
+            print(f"[GOOGLE AUTH] ✅ New user created with ID: {result.inserted_id}")
         else:
             # Update existing user
             print(f"[GOOGLE AUTH] Existing user found: {user.get('name', 'N/A')}")
-            await db.users.update_one(
+            users_collection.update_one(
                 {"_id": user["_id"]},
                 {"$set": {
                     "last_login": datetime.utcnow(),
@@ -363,7 +380,7 @@ async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
             "role": user.get("role", "user")
         }
         
-        print(f"[GOOGLE AUTH] SUCCESS: Token generated for user: {user_info['email']}\n")
+        print(f"[GOOGLE AUTH] ✅ SUCCESS: Token generated for user: {user_info['email']}")
         
         return TokenResponse(
             message="Google login successful",
@@ -382,17 +399,193 @@ async def google_auth(auth_data: GoogleAuthRequest, db=Depends(get_database)):
             detail="Invalid Google token"
         )
     except Exception as e:
+        error_str = str(e).lower()
         print(f"[GOOGLE AUTH] ERROR: {str(e)}")
-        import traceback
-        print(f"   Traceback: {traceback.format_exc()}")
+        
+        # Handle MongoDB connection errors gracefully
+        if "ssl" in error_str or "connection" in error_str or "handshake" in error_str:
+            print(f"[GOOGLE AUTH] ERROR: MongoDB connection failed")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service temporarily unavailable. Please check your network connection or try again later."
+            )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google authentication error: {str(e)}"
+            detail="Google authentication error. Please try again."
         )
 
 
+@router.get("/google/login")
+def google_login_redirect():
+    """
+    Step 1: Initiate Google OAuth flow
+    Redirects user to Google's consent screen
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth is not configured"
+        )
+    
+    # Google OAuth2 endpoint
+    google_oauth_url = "https://accounts.google.com/o/oauth2/v2/auth"
+    
+    # Query parameters
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": f"{BACKEND_URL}/auth/google/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    
+    # Build the full URL
+    full_url = f"{google_oauth_url}?{urllib.parse.urlencode(params)}"
+    print(f"[GOOGLE OAUTH] Redirecting to: {full_url}")
+    
+    return RedirectResponse(url=full_url)
+
+
+@router.get("/google/callback")
+async def google_callback(code: str = None, error: str = None, state: str = None):
+    """
+    Step 2: Handle Google OAuth callback
+    Google redirects here after user authorizes
+    """
+    if error:
+        print(f"[GOOGLE CALLBACK] Error from Google: {error}")
+        error_msg = urllib.parse.quote(error)
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/login?error={error_msg}",
+            status_code=302
+        )
+    
+    if not code:
+        print(f"[GOOGLE CALLBACK] No authorization code received")
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/login?error=No_auth_code",
+            status_code=302
+        )
+    
+    try:
+        print(f"[GOOGLE CALLBACK] Received auth code, exchanging for token...")
+        
+        # Exchange authorization code for tokens
+        import requests
+        token_url = "https://oauth2.googleapis.com/token"
+        
+        token_data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": f"{BACKEND_URL}/auth/google/callback",
+            "grant_type": "authorization_code"
+        }
+        
+        token_response = requests.post(token_url, data=token_data)
+        token_response.raise_for_status()
+        tokens = token_response.json()
+        
+        print(f"[GOOGLE CALLBACK] Received tokens from Google")
+        
+        # Get user info from ID token
+        id_token_str = tokens.get("id_token")
+        if not id_token_str:
+            raise ValueError("No ID token in response")
+        
+        # Verify and decode the ID token
+        idinfo = id_token.verify_oauth2_token(
+            id_token_str,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        
+        print(f"[GOOGLE CALLBACK] ID token verified")
+        
+        # Extract user information
+        email = idinfo.get("email")
+        name = idinfo.get("name")
+        google_id = idinfo.get("sub")
+        
+        if not email:
+            raise ValueError("No email in ID token")
+        
+        print(f"[GOOGLE CALLBACK] Processing user: {email}")
+        
+        # Check if user exists in MongoDB
+        user = users_collection.find_one({"email": email})
+        
+        if not user:
+            # Create new user
+            print(f"[GOOGLE CALLBACK] Creating new user: {email}")
+            user_document = {
+                "name": name,
+                "email": email,
+                "hashed_password": None,
+                "google_id": google_id,
+                "auth_provider": "google",
+                "role": "user",
+                "created_at": datetime.utcnow(),
+                "last_login": datetime.utcnow()
+            }
+            result = users_collection.insert_one(user_document)
+            user = users_collection.find_one({"_id": result.inserted_id})
+            print(f"[GOOGLE CALLBACK] New user created with ID: {result.inserted_id}")
+        else:
+            # Update existing user
+            print(f"[GOOGLE CALLBACK] Updating existing user: {email}")
+            users_collection.update_one(
+                {"_id": user["_id"]},
+                {
+                    "$set": {
+                        "last_login": datetime.utcnow(),
+                        "google_id": google_id,
+                        "name": name
+                    }
+                }
+            )
+        
+        # Create JWT token
+        print(f"[GOOGLE CALLBACK] Creating JWT token")
+        token_data = {
+            "user_id": str(user["_id"]),
+            "email": user["email"],
+            "name": user["name"]
+        }
+        access_token = create_access_token(token_data)
+        
+        # Encode token for URL
+        token_encoded = urllib.parse.quote(access_token, safe='')
+        user_email = urllib.parse.quote(user["email"], safe='')
+        user_name = urllib.parse.quote(user["name"], safe='')
+        
+        # Redirect to frontend with token
+        redirect_url = f"{FRONTEND_URL}/auth/callback?token={token_encoded}&email={user_email}&name={user_name}&success=true"
+        print(f"[GOOGLE CALLBACK] ✅ SUCCESS: Redirecting to {FRONTEND_URL}/auth/callback")
+        
+        return RedirectResponse(url=redirect_url, status_code=302)
+        
+    except ValueError as e:
+        print(f"[GOOGLE CALLBACK] Token verification failed: {str(e)}")
+        error_msg = urllib.parse.quote(f"Token verification failed: {str(e)}", safe='')
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/login?error={error_msg}",
+            status_code=302
+        )
+    except Exception as e:
+        print(f"[GOOGLE CALLBACK] Error: {str(e)}")
+        error_msg = urllib.parse.quote(f"Authentication error: {str(e)}", safe='')
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/login?error={error_msg}",
+            status_code=302
+        )
+
+
+
 @router.get("/users/me", response_model=UserResponse)
-async def get_current_user(email: str, db=Depends(get_database)):
+async def get_current_user(email: str, db=Depends(lambda: get_database("users"))):
     """
     Get current user information by email
     (This endpoint can be enhanced with JWT token authentication)
@@ -407,7 +600,10 @@ async def get_current_user(email: str, db=Depends(get_database)):
         HTTPException: 404 if user not found
     """
     
-    user = await db.users.find_one({"email": email})
+    # Get the user_accounts collection from the users database
+    users_collection = db["user_accounts"]
+    
+    user = await users_collection.find_one({"email": email})
     
     if not user:
         raise HTTPException(
@@ -422,7 +618,7 @@ async def get_current_user(email: str, db=Depends(get_database)):
 
 
 @router.get("/health")
-async def health_check(db=Depends(get_database)):
+async def health_check(db=Depends(lambda: get_database("users"))):
     """
     Health check endpoint for authentication service
     Verifies database connectivity
@@ -430,7 +626,10 @@ async def health_check(db=Depends(get_database)):
     try:
         # Test database connection
         await db.command('ping')
-        user_count = await db.users.count_documents({})
+        
+        # Get the user_accounts collection and count documents
+        users_collection = db["user_accounts"]
+        user_count = await users_collection.count_documents({})
         
         return {
             "status": "healthy",

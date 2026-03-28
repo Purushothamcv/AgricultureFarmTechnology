@@ -8,10 +8,10 @@ import joblib
 import pandas as pd
 from utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
 from auth import router as auth_router
-from database import connect_to_mongodb, close_mongodb_connection, database
+from database import connect_to_mongodb, close_mongodb_connection, get_database
 from db_helpers import get_database_stats
-from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse
-from crop_service import predict_crop, fetch_all_location_data
+from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse, WeatherAndPHDataResponse
+from crop_service import predict_crop, fetch_all_location_data, fetch_weather_and_ph_only
 from fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
 # Import PRODUCTION fruit disease API (frozen model, inference-only)
 from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
@@ -27,10 +27,13 @@ from yield_prediction_service import get_yield_service, startup_event as yield_s
 from agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
 # Import Fertilizer Prediction Service (Dataset-based ML)
 from fertilizer_prediction_service import get_fertilizer_service
+from fertilizer_auto_fill_service import get_fertilizer_auto_fill_service
 # Import Stress Prediction Service (Simplified Farmer-Friendly Model)
 from stress_prediction_service import stress_service
 # Import Soil Data Service (External API Integration for Map)
 from soil_data_service import get_soil_data_service
+# Import Stress Agent (Agentic AI for explanations and recommendations)
+from stress_agent import generate_stress_insights
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 app.add_event_handler("startup", agentic_ai_startup)
@@ -41,8 +44,12 @@ async def startup_event():
     """Initialize MongoDB connection and ML models on application startup"""
     print("🚀 Starting SmartAgri API...")
     
-    # MongoDB connection (already handles failures gracefully)
-    await connect_to_mongodb()
+    # MongoDB connection with error handling - don't block startup if it fails
+    try:
+        await connect_to_mongodb()
+    except Exception as e:
+        print(f"⚠️  MongoDB connection failed: {e}")
+        print("⚠️  Continuing startup - database operations will fail until connection restored")
     
     # Initialize each service with error handling
     # If a service fails, log it but continue with others
@@ -101,9 +108,11 @@ allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
+    "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
+    "http://127.0.0.1:5173",  # Vite dev server (127.0.0.1)
     "https://agriculture-farm-technology.vercel.app",
     "https://*.vercel.app",
     "https://smartagri-backend-ckcz.onrender.com",  # Allow backend to call itself
@@ -165,6 +174,11 @@ class LegacyYieldRequest(BaseModel):
     lat: float = None
     lon: float = None
 
+
+class FertilizerAutoFillRequest(BaseModel):
+    latitude: float
+    longitude: float
+
 # Load ML models
 yield_model = joblib.load("model/yield_model.pkl")
 time_model = joblib.load("model/best_window_model.pkl")
@@ -182,9 +196,10 @@ crop_model = joblib.load("model/crop_model.pkl")
 async def root():
     """Root endpoint - health check"""
     try:
-        db_status = "connected" if database and database.client else "disconnected"
-    except:
-        db_status = "unknown"
+        get_database()
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
     
     return {
         "status": "ok",
@@ -196,9 +211,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    db_status = "connected" if database else "disconnected"
+    try:
+        get_database()
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
     return {
-        "status": "healthy" if database else "degraded",
+        "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
         "api": "ok"
     }
@@ -262,28 +281,35 @@ async def predict_crop_manual(input_data: ManualCropInput):
 @app.post("/predict/location", response_model=CropPredictionResponse)
 async def predict_crop_location(input_data: LocationCropInput):
     """
-    Crop recommendation based on location (map selection)
+    Crop recommendation based on location (map selection) with manual NPK input
     
-    Fetches weather and soil data based on coordinates
-    User can override auto-fetched values
+    Important: NPK values MUST be provided by the user from soil test.
+    Only weather and pH data can be fetched from location.
+    
+    Args:
+        input_data: LocationCropInput with:
+          - REQUIRED: latitude, longitude, nitrogen, phosphorus, potassium
+          - OPTIONAL: temperature, humidity, ph, rainfall, ozone (will fetch if not provided)
     """
     try:
-        # Fetch location data if not all values are provided
+        # NPK values are REQUIRED - they come from user's soil test
+        # (LocationCropInput model now enforces this)
+        nitrogen = input_data.nitrogen
+        phosphorus = input_data.phosphorus
+        potassium = input_data.potassium
+        
+        # Fetch weather and pH data if not all provided
         if any(v is None for v in [
-            input_data.nitrogen, input_data.phosphorus, input_data.potassium,
             input_data.temperature, input_data.humidity, input_data.ph, input_data.rainfall, input_data.ozone
         ]):
-            location_data = await fetch_all_location_data(
+            location_data = await fetch_weather_and_ph_only(
                 input_data.latitude,
                 input_data.longitude
             )
         else:
             location_data = {}
         
-        # Use provided values or fallback to fetched values
-        nitrogen = input_data.nitrogen if input_data.nitrogen is not None else location_data.get("nitrogen", 50)
-        phosphorus = input_data.phosphorus if input_data.phosphorus is not None else location_data.get("phosphorus", 50)
-        potassium = input_data.potassium if input_data.potassium is not None else location_data.get("potassium", 50)
+        # Use provided values or fallback to fetched values (for weather/pH only)
         temperature = input_data.temperature if input_data.temperature is not None else location_data.get("temperature", 25)
         humidity = input_data.humidity if input_data.humidity is not None else location_data.get("humidity", 70)
         ph = input_data.ph if input_data.ph is not None else location_data.get("ph", 6.5)
@@ -318,7 +344,7 @@ async def predict_crop_location(input_data: LocationCropInput):
                 "rainfall": rainfall,
                 "ozone": ozone
             },
-            message="Crop recommendation generated successfully from location"
+            message="Crop recommendation generated successfully (NPK from soil test, weather data auto-filled)"
         )
     
     except Exception as e:
@@ -330,16 +356,19 @@ async def predict_crop_location(input_data: LocationCropInput):
         )
 
 
-@app.get("/api/location-data", response_model=LocationDataResponse)
+@app.get("/api/location-data", response_model=WeatherAndPHDataResponse)
 async def get_location_data(latitude: float, longitude: float):
     """
-    Fetch weather and soil data for a given location
+    Fetch weather and pH data for crop recommendation (NO NPK values)
     
-    Used to auto-populate form fields when user selects location on map
+    Used to auto-populate weather fields when user selects location on map.
+    
+    Important: NPK values are INTENTIONALLY excluded as they must come from 
+    the user's soil test. The frontend should show NPK as manual-entry-only fields.
     """
     try:
-        data = await fetch_all_location_data(latitude, longitude)
-        return LocationDataResponse(**data)
+        data = await fetch_weather_and_ph_only(latitude, longitude)
+        return WeatherAndPHDataResponse(**data)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch location data: {str(e)}")
@@ -633,22 +662,28 @@ def api_recommend_fertilizer(data: dict):
     ML-based fertilizer recommendation using trained model
     
     Required inputs from frontend:
-    - Soil_Type, Soil_pH, Soil_Moisture, Organic_Carbon, Electrical_Conductivity
+    - Soil_Type, Soil_pH
     - Nitrogen_Level, Phosphorus_Level, Potassium_Level
     - Crop_Type, Crop_Growth_Stage, Season
     - Temperature, Humidity, Rainfall
     - Irrigation_Type, Previous_Crop, Region
+    
+    Optional/Hidden inputs (use defaults if not provided):
+    - Soil_Moisture (default: 50)
+    - Organic_Carbon (default: 0.8)
+    - Electrical_Conductivity (default: 1.2)
     """
     try:
         fertilizer_service = get_fertilizer_service()
         
-        # Extract all required features from request
+        # Extract all required features from request with defaults for hidden fields
         inputs = {
             'Soil_Type': data.get('Soil_Type'),
             'Soil_pH': float(data.get('Soil_pH')),
-            'Soil_Moisture': float(data.get('Soil_Moisture')),
-            'Organic_Carbon': float(data.get('Organic_Carbon')),
-            'Electrical_Conductivity': float(data.get('Electrical_Conductivity')),
+            # Hidden fields with defaults
+            'Soil_Moisture': float(data.get('Soil_Moisture', 50)),
+            'Organic_Carbon': float(data.get('Organic_Carbon', 0.8)),
+            'Electrical_Conductivity': float(data.get('Electrical_Conductivity', 1.2)),
             'Nitrogen_Level': float(data.get('Nitrogen_Level')),
             'Phosphorus_Level': float(data.get('Phosphorus_Level')),
             'Potassium_Level': float(data.get('Potassium_Level')),
@@ -680,6 +715,33 @@ def api_recommend_fertilizer(data: dict):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+@app.post("/fertilizer/auto-fill")
+def fertilizer_auto_fill(payload: FertilizerAutoFillRequest):
+    """
+    Auto-fill fertilizer soil/nutrient fields from location.
+
+    Returns only the requested fields. On failure, returns all fields as null.
+    """
+    try:
+        if not (-90 <= payload.latitude <= 90) or not (-180 <= payload.longitude <= 180):
+            raise HTTPException(status_code=400, detail="Invalid latitude or longitude")
+
+        service = get_fertilizer_auto_fill_service()
+        return service.get_auto_fill(payload.latitude, payload.longitude)
+    except HTTPException:
+        raise
+    except Exception:
+        return {
+            "soil_pH": None,
+            "soil_moisture": None,
+            "organic_carbon": None,
+            "electrical_conductivity": None,
+            "nitrogen": None,
+            "phosphorus": None,
+            "potassium": None,
+        }
 
 
 @app.get("/api/fertilizer/options")
@@ -944,7 +1006,7 @@ def get_stress_options():
 
 @app.post("/api/stress/predict")
 def api_predict_stress(data: dict):
-    """Predict crop stress level using ML model with farmer-friendly inputs"""
+    """Predict crop stress level using ML model with AI-powered explanations"""
     try:
         # Auto-fetch weather data if location provided and weather not included
         if 'lat' in data and 'lng' in data:
@@ -959,8 +1021,39 @@ def api_predict_stress(data: dict):
                     data.setdefault('rainfall', weather.get('rain', 50))
                     data.setdefault('wind_speed', weather.get('wind', 10))
         
-        # Make prediction
-        result = stress_service.predict(data)
+        # Step 1: Get ML model prediction
+        print("🤖 Running ML model prediction...")
+        ml_prediction = stress_service.predict(data)
+        
+        # Check if ML prediction was successful
+        if not ml_prediction.get('success', False):
+            return ml_prediction
+        
+        # Step 2: Generate AI-powered explanation and recommendations
+        print("🧠 Generating AI insights using Groq LLM...")
+        try:
+            ai_insights = generate_stress_insights(data, ml_prediction)
+            
+            # Merge AI insights with ML prediction
+            result = {
+                **ml_prediction,
+                "ai_explanation": ai_insights.get('explanation', ''),
+                "ai_recommendations": ai_insights.get('recommendations', []),
+                "reasoning_source": ai_insights.get('reasoning_source', ''),
+                "enhanced_with_ai": True
+            }
+        except Exception as e:
+            print(f"⚠️ AI explanation generation failed: {e}")
+            # Return ML prediction without AI enhancement if LLM fails
+            result = {
+                **ml_prediction,
+                "ai_explanation": "",
+                "ai_recommendations": [],
+                "reasoning_source": "ML Model Only",
+                "enhanced_with_ai": False
+            }
+        
+        print("✅ Stress prediction with AI insights complete")
         return result
         
     except Exception as e:

@@ -37,10 +37,13 @@ class LocationCropInput(BaseModel):
     latitude: float = Field(..., ge=-90, le=90, description="Latitude")
     longitude: float = Field(..., ge=-180, le=180, description="Longitude")
     
-    # Optional override values (if user wants to edit auto-fetched data)
-    nitrogen: Optional[float] = Field(None, ge=0, le=200)
-    phosphorus: Optional[float] = Field(None, ge=0, le=200)
-    potassium: Optional[float] = Field(None, ge=0, le=200)
+    # NPK values are REQUIRED and must come from user's soil test
+    # They cannot be auto-estimated from location data
+    nitrogen: float = Field(..., ge=0.01, le=200, description="Nitrogen from soil test (kg/ha)")
+    phosphorus: float = Field(..., ge=0.01, le=200, description="Phosphorus from soil test (kg/ha)")
+    potassium: float = Field(..., ge=0.01, le=200, description="Potassium from soil test (kg/ha)")
+    
+    # Weather and soil pH data are optional (can be auto-fetched from location)
     temperature: Optional[float] = Field(None, ge=-10, le=60)
     humidity: Optional[float] = Field(None, ge=0, le=100)
     ph: Optional[float] = Field(None, ge=3.0, le=10.0)
@@ -105,4 +108,21 @@ class LocationDataResponse(BaseModel):
     ph: float
     ozone: float
     location_name: Optional[str] = None
+    message: Optional[str] = None
+
+
+class WeatherAndPHDataResponse(BaseModel):
+    """Schema for weather and pH data (NO NPK - for crop recommendation)
+    
+    Used when fetching location data for crop recommendation.
+    NPK values are intentionally excluded as they must come from user's soil test.
+    """
+    success: bool
+    latitude: float
+    longitude: float
+    temperature: float
+    humidity: float
+    rainfall: float
+    ph: float
+    ozone: float
     message: Optional[str] = None

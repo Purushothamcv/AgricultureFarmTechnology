@@ -6,16 +6,23 @@ import { Droplet, Sparkles, MapPin, X } from 'lucide-react';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const AUTO_FILL_FIELD_MAP = {
+  Soil_pH: 'soil_pH',
+  Nitrogen_Level: 'nitrogen',
+  Phosphorus_Level: 'phosphorus',
+  Potassium_Level: 'potassium'
+};
+// Note: Soil_Moisture, Organic_Carbon, and Electrical_Conductivity are now hidden and use default values
+
+const AUTO_FILL_API_FIELDS = Object.values(AUTO_FILL_FIELD_MAP);
 
 const FertilizerRecommendation = () => {
   const [formData, setFormData] = useState({
     // Soil characteristics
     Soil_Type: '',
     Soil_pH: '',
-    Soil_Moisture: '',
-    Organic_Carbon: '',
-    Electrical_Conductivity: '',
     
     // NPK Levels
     Nitrogen_Level: '',
@@ -47,9 +54,24 @@ const FertilizerRecommendation = () => {
   const [mapLoading, setMapLoading] = useState(false);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
   const [loadingWeather, setLoadingWeather] = useState(false);
-  const [useMapData, setUseMapData] = useState(true); // Toggle for map vs manual
+  const [useMapData, setUseMapData] = useState(true); // Toggle for auto data vs manual
   const [soilDataFetched, setSoilDataFetched] = useState(false); // Track if soil data was fetched
   const [weatherDataFetched, setWeatherDataFetched] = useState(false); // Track if weather data was fetched
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
+  const [autoFillMessage, setAutoFillMessage] = useState('');
+  const [autoFieldStatus, setAutoFieldStatus] = useState({});
+
+  const isAutoFieldAvailable = (formFieldName) => {
+    if (!useMapData) return true;
+    if (!soilDataFetched) return true;
+    const apiField = AUTO_FILL_FIELD_MAP[formFieldName];
+    if (!apiField) return true;
+    return autoFieldStatus[apiField] === true;
+  };
+
+  const autoUnavailableFields = useMapData
+    ? Object.keys(AUTO_FILL_FIELD_MAP).filter((field) => !isAutoFieldAvailable(field))
+    : [];
 
   // Load dropdown options on mount
   useEffect(() => {
@@ -90,9 +112,6 @@ const FertilizerRecommendation = () => {
     setFormData({
       Soil_Type: '',
       Soil_pH: '',
-      Soil_Moisture: '',
-      Organic_Carbon: '',
-      Electrical_Conductivity: '',
       Nitrogen_Level: '',
       Phosphorus_Level: '',
       Potassium_Level: '',
@@ -110,10 +129,16 @@ const FertilizerRecommendation = () => {
     setLocationData(null);
     setWeatherDataFetched(false);
     setSoilDataFetched(false);
+    setAutoFillMessage('');
+    setAutoFieldStatus({});
+    setUseMapData(true);
   };
 
   const handleMapLocationSelect = async (lat, lng) => {
     setMapLoading(true);
+    setAutoFillLoading(true);
+    setAutoFillMessage('Fetching soil data...');
+
     try {
       const response = await axios.post(`${API_URL}/api/fertilizer/location-data`, {
         latitude: lat,
@@ -155,47 +180,75 @@ const FertilizerRecommendation = () => {
         const hasSoilData = data.soil_pH || data.soil_type || data.elevation;
         if (hasSoilData) {
           notificationParts.push(`✅ Soil data: pH ${data.soil_pH || 'N/A'}, Type: ${data.soil_type || 'N/A'}`);
-          setSoilDataFetched(true);
         } else {
           notificationParts.push(`⚠️ Soil data unavailable - please enter manually`);
-          setSoilDataFetched(false);
         }
 
-        // Autofill form with location, weather, AND soil data
-        // For number inputs, keep values as numbers (not strings) for proper display
+        // Autofill location and weather metadata.
         setFormData(prev => ({
           ...prev,
-          // Location & Weather - Keep as numbers for number inputs
           Region: data.region !== undefined && data.region !== null ? data.region : prev.Region,
           Temperature: data.temperature !== undefined && data.temperature !== null ? String(data.temperature) : prev.Temperature,
           Humidity: data.humidity !== undefined && data.humidity !== null ? String(data.humidity) : prev.Humidity,
           Rainfall: data.rainfall !== undefined && data.rainfall !== null ? String(data.rainfall) : prev.Rainfall,
-          
-          // Soil Characteristics - Keep as numbers
-          Soil_Type: data.soil_type || prev.Soil_Type,
-          Soil_pH: data.soil_pH !== undefined && data.soil_pH !== null ? String(data.soil_pH) : prev.Soil_pH,
-          Soil_Moisture: data.soil_moisture !== undefined && data.soil_moisture !== null ? String(data.soil_moisture) : prev.Soil_Moisture,
-          Organic_Carbon: data.organic_carbon !== undefined && data.organic_carbon !== null ? String(data.organic_carbon) : prev.Organic_Carbon,
-          Electrical_Conductivity: data.electrical_conductivity !== undefined && data.electrical_conductivity !== null ? String(data.electrical_conductivity) : prev.Electrical_Conductivity
+          Soil_Type: data.soil_type || prev.Soil_Type
         }));
         
-        console.log('✅ Form data updated with fetched values');
+        // Call new fertilizer-only auto-fill endpoint for soil + NPK fields.
+        const autoFillResponse = await axios.post(
+          `${API_URL}/fertilizer/auto-fill`,
+          { latitude: lat, longitude: lng },
+          { timeout: 2000 }
+        );
+
+        const autoData = autoFillResponse.data || {};
+        const newStatus = {};
+        AUTO_FILL_API_FIELDS.forEach((field) => {
+          newStatus[field] = autoData[field] !== null && autoData[field] !== undefined;
+        });
+        setAutoFieldStatus(newStatus);
+
+        const hasAnyAutoField = AUTO_FILL_API_FIELDS.some((field) => newStatus[field]);
+
+        if (hasAnyAutoField) {
+          setSoilDataFetched(true);
+          setAutoFillMessage('Auto data applied. Unavailable fields are hidden in auto mode.');
+          setFormData((prev) => ({
+            ...prev,
+            Soil_pH: newStatus.soil_pH ? String(autoData.soil_pH) : prev.Soil_pH
+            // Note: Soil_Moisture, Organic_Carbon, Electrical_Conductivity are not included in form anymore
+            // They will be added with default values during submission
+          }));
+        } else {
+          setSoilDataFetched(false);
+          setUseMapData(false);
+          setAutoFillMessage('Soil data not available. Please enter manually.');
+          notificationParts.push('⚠️ Soil data not available. Manual input enabled.');
+        }
 
         setShowMap(false);
         alert(notificationParts.join('\n'));
       }
     } catch (err) {
       console.error('Error fetching location data:', err);
-      alert('Failed to fetch location data. Please try again or enter manually.');
+      setUseMapData(false);
       setSoilDataFetched(false);
+      setAutoFieldStatus({});
+      setAutoFillMessage('Soil data not available. Please enter manually.');
+      alert('Failed to fetch location data. Manual input is enabled.');
+    } finally {
+      setAutoFillLoading(false);
+      setMapLoading(false);
     }
-    setMapLoading(false);
   };
 
   const handleResetLocation = () => {
     setLocationData(null);
     setSoilDataFetched(false);
     setWeatherDataFetched(false);
+    setAutoFillMessage('');
+    setAutoFieldStatus({});
+    setUseMapData(true);
     setFormData(prev => ({
       ...prev,
       // Clear location & weather data
@@ -205,10 +258,7 @@ const FertilizerRecommendation = () => {
       Rainfall: '',
       // Clear soil data
       Soil_Type: '',
-      Soil_pH: '',
-      Soil_Moisture: '',
-      Organic_Carbon: '',
-      Electrical_Conductivity: ''
+      Soil_pH: ''
     }));
   };
 
@@ -342,11 +392,27 @@ const FertilizerRecommendation = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (useMapData && autoUnavailableFields.length > 0) {
+      setUseMapData(false);
+      alert('Some auto data fields are unavailable. Switched to manual mode, please fill missing values.');
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 
     try {
-      const response = await axios.post(`${API_URL}/api/fertilizer/recommend`, formData);
+      // Build payload with hidden default values for simplified soil parameters
+      const payload = {
+        ...formData,
+        // Hidden default values for simplified UI (sent internally to model)
+        Soil_Moisture: 50,
+        Organic_Carbon: 0.8,
+        Electrical_Conductivity: 1.2
+      };
+
+      const response = await axios.post(`${API_URL}/api/fertilizer/recommend`, payload);
       
       if (response.data.success) {
         setResult(response.data);
@@ -418,6 +484,29 @@ const FertilizerRecommendation = () => {
                         </button>
                       )}
                     </div>
+
+                    <div className="mb-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setUseMapData(true)}
+                        className={`px-3 py-1.5 text-xs rounded border ${useMapData ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                      >
+                        Use Auto Data
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUseMapData(false)}
+                        className={`px-3 py-1.5 text-xs rounded border ${!useMapData ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-700 border-gray-300'}`}
+                      >
+                        Enter Manually
+                      </button>
+                    </div>
+
+                    {(autoFillLoading || autoFillMessage) && (
+                      <div className={`mb-3 p-2 rounded text-xs ${autoFillLoading ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-amber-50 text-amber-800 border border-amber-300'}`}>
+                        {autoFillLoading ? 'Fetching soil data...' : autoFillMessage}
+                      </div>
+                    )}
                     
                     {locationData ? (
                       <div className="bg-white p-3 rounded border border-blue-300">
@@ -550,7 +639,7 @@ const FertilizerRecommendation = () => {
                     
                     {soilDataFetched && (
                       <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                        <span className="font-medium">✓ Soil data loaded from location.</span> You can still modify any values manually if needed.
+                        <span className="font-medium">✓ Soil data loaded from location.</span> Toggle to manual mode to enter all fields.
                       </div>
                     )}
                     
@@ -579,10 +668,11 @@ const FertilizerRecommendation = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Soil pH <span className="text-red-500">*</span>
-                          {locationData?.soil_pH && (
-                            <span className="ml-1 text-xs text-green-600">📍</span>
+                          {useMapData && isAutoFieldAvailable('Soil_pH') && (
+                            <span className="ml-1 text-xs text-green-600">Auto-filled</span>
                           )}
                         </label>
+                        {(!useMapData || isAutoFieldAvailable('Soil_pH')) && (
                         <input
                           type="number"
                           name="Soil_pH"
@@ -593,72 +683,12 @@ const FertilizerRecommendation = () => {
                           min="4"
                           max="9"
                           step="0.1"
-                          className={`input-field ${locationData?.soil_pH ? 'bg-green-50 border-green-300' : ''}`}
+                          className={`input-field ${useMapData && isAutoFieldAvailable('Soil_pH') ? 'bg-green-50 border-green-300' : ''}`}
                         />
+                        )}
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Soil Moisture (%) <span className="text-red-500">*</span>
-                          {locationData?.soil_moisture && (
-                            <span className="ml-1 text-xs text-green-600">📍</span>
-                          )}
-                        </label>
-                        <input
-                          type="number"
-                          name="Soil_Moisture"
-                          value={formData.Soil_Moisture}
-                          onChange={handleChange}
-                          placeholder="0 - 100"
-                          required
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          className={`input-field ${locationData?.soil_moisture ? 'bg-green-50 border-green-300' : ''}`}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Organic Carbon (%) <span className="text-red-500">*</span>
-                          {locationData?.organic_carbon && (
-                            <span className="ml-1 text-xs text-green-600">📍</span>
-                          )}
-                        </label>
-                        <input
-                          type="number"
-                          name="Organic_Carbon"
-                          value={formData.Organic_Carbon}
-                          onChange={handleChange}
-                          placeholder="0 - 5"
-                          required
-                          min="0"
-                          max="5"
-                          step="0.01"
-                          className={`input-field ${locationData?.organic_carbon ? 'bg-green-50 border-green-300' : ''}`}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Electrical Conductivity (dS/m) <span className="text-red-500">*</span>
-                          {locationData?.electrical_conductivity && (
-                            <span className="ml-1 text-xs text-green-600">📍</span>
-                          )}
-                        </label>
-                        <input
-                          type="number"
-                          name="Electrical_Conductivity"
-                          value={formData.Electrical_Conductivity}
-                          onChange={handleChange}
-                          placeholder="0 - 4"
-                          required
-                          min="0"
-                          max="4"
-                          step="0.01"
-                          className={`input-field ${locationData?.electrical_conductivity ? 'bg-green-50 border-green-300' : ''}`}
-                        />
-                      </div>
+
                     </div>
                   </div>
 
@@ -670,8 +700,9 @@ const FertilizerRecommendation = () => {
                     </h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {(!useMapData || isAutoFieldAvailable('Nitrogen_Level')) && (
                       <InputField
-                        label="Nitrogen Level"
+                        label={useMapData && isAutoFieldAvailable('Nitrogen_Level') ? 'Nitrogen Level (Auto-filled)' : 'Nitrogen Level'}
                         name="Nitrogen_Level"
                         type="number"
                         value={formData.Nitrogen_Level}
@@ -682,9 +713,11 @@ const FertilizerRecommendation = () => {
                         max="200"
                         step="0.1"
                       />
-                      
+                      )}
+
+                      {(!useMapData || isAutoFieldAvailable('Phosphorus_Level')) && (
                       <InputField
-                        label="Phosphorus Level"
+                        label={useMapData && isAutoFieldAvailable('Phosphorus_Level') ? 'Phosphorus Level (Auto-filled)' : 'Phosphorus Level'}
                         name="Phosphorus_Level"
                         type="number"
                         value={formData.Phosphorus_Level}
@@ -695,9 +728,11 @@ const FertilizerRecommendation = () => {
                         max="200"
                         step="0.1"
                       />
-                      
+                      )}
+
+                      {(!useMapData || isAutoFieldAvailable('Potassium_Level')) && (
                       <InputField
-                        label="Potassium Level"
+                        label={useMapData && isAutoFieldAvailable('Potassium_Level') ? 'Potassium Level (Auto-filled)' : 'Potassium Level'}
                         name="Potassium_Level"
                         type="number"
                         value={formData.Potassium_Level}
@@ -708,6 +743,7 @@ const FertilizerRecommendation = () => {
                         max="400"
                         step="0.1"
                       />
+                      )}
                     </div>
                   </div>
 

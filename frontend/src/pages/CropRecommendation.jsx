@@ -88,20 +88,22 @@ const CropRecommendation = () => {
     try {
       const data = await cropService.fetchLocationData(lat, lng);
       if (data.success) {
-        setFormData({
-          nitrogen: data.nitrogen?.toFixed(2) || '',
-          phosphorus: data.phosphorus?.toFixed(2) || '',
-          potassium: data.potassium?.toFixed(2) || '',
+        // Only auto-fill weather and soil pH data
+        // NPK MUST be entered manually by the user from soil test
+        setFormData(prev => ({
+          ...prev,
           temperature: data.temperature?.toFixed(2) || '',
           humidity: data.humidity?.toFixed(2) || '',
           ph: data.ph?.toFixed(2) || '',
           rainfall: data.rainfall?.toFixed(2) || '',
           ozone: data.ozone?.toFixed(2) || ''
-        });
+          // Note: nitrogen, phosphorus, potassium kept empty - user must enter manually
+        }));
+        setError('');
       }
     } catch (err) {
       console.error('Error fetching location data:', err);
-      setError('Failed to fetch location data. Please enter values manually.');
+      setError('Unable to fetch weather data. Please enter all values manually.');
     }
     setFetchingLocation(false);
   };
@@ -144,6 +146,23 @@ const CropRecommendation = () => {
     setLoading(true);
     setError('');
     setResult(null);
+
+    // Validate NPK values are provided and > 0
+    if (!formData.nitrogen || parseFloat(formData.nitrogen) <= 0) {
+      setError('❌ Please enter a valid Nitrogen value (must be > 0)');
+      setLoading(false);
+      return;
+    }
+    if (!formData.phosphorus || parseFloat(formData.phosphorus) <= 0) {
+      setError('❌ Please enter a valid Phosphorus value (must be > 0)');
+      setLoading(false);
+      return;
+    }
+    if (!formData.potassium || parseFloat(formData.potassium) <= 0) {
+      setError('❌ Please enter a valid Potassium value (must be > 0)');
+      setLoading(false);
+      return;
+    }
 
     try {
       let data;
@@ -290,41 +309,50 @@ const CropRecommendation = () => {
                     </div>
                   )}
 
+                  <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                    <p className="text-blue-900 font-semibold text-sm">
+                      📋 Important: Please enter NPK values from your soil test for accurate results.
+                    </p>
+                    <p className="text-blue-800 text-sm mt-1">
+                      NPK values cannot be accurately obtained from location data alone.
+                    </p>
+                  </div>
+
                   <form onSubmit={handleSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <InputField
-                        label="Nitrogen (N) - kg/ha"
+                        label="Nitrogen (N) - kg/ha *"
                         name="nitrogen"
                         type="number"
                         value={formData.nitrogen}
                         onChange={handleChange}
-                        placeholder="0-200"
+                        placeholder="Enter soil test value"
                         required
-                        min="0"
+                        min="0.01"
                         max="200"
                         step="0.01"
                       />
                       <InputField
-                        label="Phosphorus (P) - kg/ha"
+                        label="Phosphorus (P) - kg/ha *"
                         name="phosphorus"
                         type="number"
                         value={formData.phosphorus}
                         onChange={handleChange}
-                        placeholder="0-200"
+                        placeholder="Enter soil test value"
                         required
-                        min="0"
+                        min="0.01"
                         max="200"
                         step="0.01"
                       />
                       <InputField
-                        label="Potassium (K) - kg/ha"
+                        label="Potassium (K) - kg/ha *"
                         name="potassium"
                         type="number"
                         value={formData.potassium}
                         onChange={handleChange}
-                        placeholder="0-200"
+                        placeholder="Enter soil test value"
                         required
-                        min="0"
+                        min="0.01"
                         max="200"
                         step="0.01"
                       />

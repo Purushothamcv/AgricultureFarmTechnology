@@ -21,12 +21,25 @@ try {
     exit 1
 }
 
-Write-Host "`n[2/3] Checking if port 8000 is available..." -ForegroundColor Yellow
+Write-Host "`n[2/4] Checking if backend is already running..." -ForegroundColor Yellow
+try {
+    $health = Invoke-WebRequest -UseBasicParsing 'http://localhost:8000/health' -TimeoutSec 2
+    if ($health.StatusCode -eq 200) {
+        Write-Host "      Backend is already running on http://localhost:8000" -ForegroundColor Green
+        Write-Host "      Stop the existing backend instance before starting a new one." -ForegroundColor Gray
+        Read-Host "Press Enter to exit"
+        exit 0
+    }
+} catch {
+    # Not running yet, continue startup.
+}
+
+Write-Host "`n[3/4] Checking if port 8000 is available..." -ForegroundColor Yellow
 $portInUse = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 if ($portInUse) {
     Write-Host "      Port 8000 is in use. Killing processes..." -ForegroundColor Yellow
-    $portInUse | ForEach-Object {
-        Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+    $portInUse | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
+        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
     }
     Start-Sleep -Seconds 2
     Write-Host "      Port 8000 is now free!" -ForegroundColor Green
@@ -34,11 +47,11 @@ if ($portInUse) {
     Write-Host "      Port 8000 is available!" -ForegroundColor Green
 }
 
-Write-Host "`n[3/3] Starting backend server on http://localhost:8000..." -ForegroundColor Yellow
+Write-Host "`n[4/4] Starting backend server on http://localhost:8000..." -ForegroundColor Yellow
 Write-Host "      Press Ctrl+C to stop the server" -ForegroundColor Gray
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Start the server (this will block and show all output)
-python -m uvicorn main_fastapi:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main_fastapi:app --host 0.0.0.0 --port 8000
 
 Write-Host "`nServer stopped." -ForegroundColor Yellow

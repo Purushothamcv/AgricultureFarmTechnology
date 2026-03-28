@@ -47,18 +47,48 @@ groq_client = None
 # ============================================================================
 
 AGRICULTURAL_CONTEXT = """
-You are SmartAgri AI Assistant, an expert agricultural advisor specializing in Indian farming practices. 
-You have deep knowledge about:
+You are SmartAgri AI Assistant, an advanced agricultural expert integrated into the Smart Agriculture Decision Support System.
 
-1. CROPS: Rice, Wheat, Cotton, Maize, Sugarcane, Jute, Coffee, Tea, and more
-2. PLANT DISEASES: Early Blight, Late Blight, Bacterial Spot, Leaf Curl, Powdery Mildew, etc.
-3. FRUIT DISEASES: Anthracnose, Black Mold, Scab, Rot, Alternaria, Cercospora, etc.
-4. FERTILIZERS: NPK ratios, Urea, DAP, Potash, organic fertilizers
-5. WEATHER CONDITIONS: Temperature, humidity, rainfall requirements
-6. SOIL TYPES: Black soil, Red soil, Alluvial soil, Laterite soil
+Core responsibilities:
+1) Crop Recommendation
+    - Suggest suitable crops from soil, location, and climate context.
+    - Explain clearly why a crop is suitable.
+2) Yield Prediction
+    - Explain predicted yield results in simple terms.
+    - Highlight factors affecting yield and practical improvement steps.
+3) Fertilizer Recommendation
+    - Recommend fertilizers using N, P, K, pH, and moisture context.
+    - Give both organic and chemical alternatives with usage guidance.
+4) Plant Disease Detection
+    - Identify likely diseases from symptoms.
+    - Provide treatment options (organic + chemical) and prevention tips.
+5) Crop Stress Analysis
+    - Explain stress causes (water, weather, nutrients, pests).
+    - Suggest corrective actions.
+6) General Farming Advice
+    - Seasonal practices, irrigation guidance, soil health, and pest management.
 
-You provide practical, farmer-friendly advice in English, Hindi, and Kannada.
-Always be helpful, accurate, and consider the Indian agricultural context.
+Context awareness rules:
+- If user says "this result", "my crop", or "my prediction", treat it as system output context.
+- If user provides state/district/crop/soil values, personalize advice using those details.
+- Keep responses aligned to SmartAgri modules and practical farm actions.
+
+Response style:
+- Use simple, farmer-friendly language.
+- Keep responses concise but helpful.
+- Prefer short action lists over long theory.
+
+Safety and reliability rules:
+- Do not hallucinate unknown facts or fake measurements.
+- If uncertain, say: "Based on available information..."
+- Do not give harmful, unsafe, or illegal instructions.
+- Prefer practical, low-risk, field-usable advice.
+
+Smart behavior:
+- If user asks "Which crop should I grow?" and key inputs are missing, ask for soil/location details.
+- If user asks yield questions, explain rainfall, nutrients, and management factors.
+- If user asks fertilizer questions and soil values are missing, ask for NPK/pH/moisture or location.
+- If user question is vague, ask one clear follow-up question before giving a final recommendation.
 """
 
 HINDI_INSTRUCTIONS = """
@@ -87,6 +117,7 @@ When user requests English language:
 - Provide responses only in English
 - Do not mix Hindi, Kannada, or other language words/scripts
 - Keep wording simple, clear, and farmer-friendly
+- Keep recommendations practical and actionable
 """
 
 # ============================================================================
@@ -296,6 +327,8 @@ async def create_chat_session(user_id: str) -> str:
     """Create a new chat session for a user."""
     collection = get_chat_collection()
     session_id = str(uuid4())
+    logger.debug(f"🆕 Creating new session - user_id: {user_id} | generated session_id: {session_id}")
+    
     await collection.insert_one(
         {
             "user_id": user_id,
@@ -306,6 +339,8 @@ async def create_chat_session(user_id: str) -> str:
             "updated_at": datetime.now(timezone.utc),
         }
     )
+    
+    logger.debug(f"💾 Session inserted to MongoDB - session_id: {session_id}")
     return session_id
 
 
@@ -330,9 +365,12 @@ async def append_messages_to_session(session_id: str, messages: List[ChatMessage
     collection = get_chat_collection()
     session = await get_chat_session(session_id)
     if not session:
+        logger.error(f"❌ Session not found for append - session_id: {session_id}")
         raise HTTPException(status_code=404, detail="Chat session not found")
 
     current_messages = normalize_stored_messages(session.get("messages", []))
+    logger.debug(f"📊 Before append - session_id: {session_id} | current messages: {len(current_messages)} | adding: {len(messages)}")
+    
     updated = trim_history_for_storage(current_messages + messages)
     computed_title = session.get("title") or "New Chat"
     if computed_title == "New Chat":
@@ -348,6 +386,8 @@ async def append_messages_to_session(session_id: str, messages: List[ChatMessage
             }
         },
     )
+    
+    logger.debug(f"📊 After append - session_id: {session_id} | total messages: {len(updated)} | new title: {computed_title}")
 
 async def get_ai_response(
     message: str,
@@ -393,7 +433,7 @@ async def get_ai_response(
         chat_completion = groq_client.chat.completions.create(
             messages=messages,
             model=MODEL_NAME,
-            temperature=0.7,
+            temperature=0.5,
             max_tokens=1024,
             top_p=1,
             stream=False
@@ -417,39 +457,90 @@ async def get_ai_response(
 router = APIRouter(tags=["AI Chatbot"])
 
 
-@router.post("/chat/new-session", response_model=NewSessionResponse)
+@router.post("/chat/new-session")
 async def new_session(request: NewSessionRequest):
     """Create and return a fresh session_id for the given user."""
     try:
-        session_id = await create_chat_session(request.user_id)
-        return NewSessionResponse(user_id=request.user_id, session_id=session_id)
-    except HTTPException:
-        raise
+        # ===== USER ID VALIDATION =====
+        if not request.user_id or not isinstance(request.user_id, str) or request.user_id.strip() == "":
+            print("❌ Error: user_id is required and cannot be empty")
+            logger.error("❌ user_id validation failed: empty or invalid user_id")
+            raise HTTPException(status_code=400, detail="user_id is required and cannot be empty")
+        
+        user_id = request.user_id.strip()
+        print(f"Creating session for user: {user_id}")
+        
+        # ===== CREATE SESSION DIRECTLY =====
+        import uuid
+        from datetime import datetime
+        
+        session_id = str(uuid.uuid4())
+        
+        new_session_doc = {
+            "session_id": session_id,
+            "user_id": user_id,
+            "messages": [],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "title": "New Chat"
+        }
+        
+        # Get collection and insert
+        try:
+            collection = get_chat_collection()
+            await collection.insert_one(new_session_doc)
+            print(f"✅ Session created and inserted to MongoDB - session_id: {session_id}")
+            logger.info(f"✅ NEW SESSION CREATED - user_id: {user_id} | session_id: {session_id}")
+        except Exception as db_error:
+            print(f"❌ Error inserting session to MongoDB: {str(db_error)}")
+            logger.error(f"❌ MongoDB insert error: {str(db_error)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "user_id": user_id
+        }
+        
+    except HTTPException as http_err:
+        # Re-raise HTTP exceptions
+        raise http_err
     except Exception as e:
-        logger.error(f"Chat session creation error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create chat session")
+        print(f"❌ Error creating session: {str(e)}")
+        logger.error(f"❌ Unexpected error in new_session: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 @router.get("/chat/history/{session_id}", response_model=SessionHistoryResponse)
 async def get_history(session_id: str, user_id: Optional[str] = Query(default=None)):
     """Return full chat history for a session."""
     try:
+        logger.info(f"📖 HISTORY REQUESTED - session_id: {session_id} | user_id: {user_id}")
+        
         session = await get_chat_session(session_id)
         if not session:
+            logger.warning(f"⚠️ Session not found - session_id: {session_id}")
             raise HTTPException(status_code=404, detail="Chat session not found")
 
         if user_id and session.get("user_id") != user_id:
+            logger.warning(f"⚠️ Session access denied - expected user_id: {user_id} | session owner: {session.get('user_id')}")
             raise HTTPException(status_code=403, detail="Session does not belong to this user")
 
+        messages = normalize_stored_messages(session.get("messages", []))
+        logger.info(f"✅ HISTORY RETRIEVED - session_id: {session_id} | message count: {len(messages)}")
+        
         return SessionHistoryResponse(
             user_id=session.get("user_id", ""),
             session_id=session_id,
-            messages=normalize_stored_messages(session.get("messages", [])),
+            messages=messages,
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Chat history retrieval error: {str(e)}")
+        logger.error(f"❌ Chat history retrieval error - session_id: {session_id} | error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch chat history")
 
 
@@ -457,6 +548,8 @@ async def get_history(session_id: str, user_id: Optional[str] = Query(default=No
 async def list_user_sessions(user_id: str, limit: int = Query(default=20, ge=1, le=100)):
     """Return recent chat sessions for sidebar rendering."""
     try:
+        logger.info(f"📋 SESSIONS LIST REQUESTED - user_id: {user_id}")
+        
         collection = get_chat_collection()
         cursor = (
             collection.find({"user_id": user_id}, {"_id": 0})
@@ -465,11 +558,15 @@ async def list_user_sessions(user_id: str, limit: int = Query(default=20, ge=1, 
         )
         sessions = await cursor.to_list(length=limit)
         summaries = [build_session_summary(session) for session in sessions]
+        
+        session_ids = [s.session_id for s in summaries]
+        logger.info(f"✅ SESSIONS LIST RETURNED - user_id: {user_id} | count: {len(summaries)} | session_ids: {session_ids}")
+        
         return SessionListResponse(user_id=user_id, sessions=summaries)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Chat sessions list error: {str(e)}")
+        logger.error(f"❌ Chat sessions list error - user_id: {user_id} | error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch chat sessions")
 
 
@@ -477,9 +574,14 @@ async def list_user_sessions(user_id: str, limit: int = Query(default=20, ge=1, 
 async def send_message(request: SendMessageRequest):
     """Send a user message using persistent conversation memory."""
     try:
+        logger.info(f"📨 MESSAGE RECEIVED - user_id: {request.user_id} | session_id: {request.session_id}")
+        logger.debug(f"📝 Message text: {request.message[:100]}...")
+        
         session = await ensure_session_owner(request.session_id, request.user_id)
         full_history = normalize_stored_messages(session.get("messages", []))
         context_history = trim_history_for_context(full_history)
+        
+        logger.debug(f"📚 Message history length: {len(full_history)} (using last {len(context_history)} for context)")
 
         assistant_text = await get_ai_response(
             message=request.message,
@@ -496,12 +598,13 @@ async def send_message(request: SendMessageRequest):
                 ChatMessage(role="assistant", content=assistant_text, timestamp=now),
             ],
         )
-
+        
+        logger.info(f"✅ MESSAGE STORED - session_id: {request.session_id} | response length: {len(assistant_text)}")
         return SendMessageResponse(response=assistant_text)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Persistent chat send error: {str(e)}")
+        logger.error(f"❌ Persistent chat send error - session_id: {request.session_id} | error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send message")
 
 @router.post("/chatbot/chat", response_model=ChatResponse)
@@ -560,7 +663,7 @@ async def health_check():
         "status": "healthy" if groq_client else "unhealthy",
         "groq_initialized": groq_client is not None,
         "model": MODEL_NAME,
-        "supported_languages": ["english", "kannada"]
+        "supported_languages": ["english", "hindi", "kannada"]
     }
 
 

@@ -106,9 +106,15 @@ const Chatbot = () => {
 
     const data = await response.json();
     const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    console.log(`📋 SESSIONS LIST LOADED - user_id: ${activeUserId} | total sessions: ${sessions.length}`);
+    if (sessions.length > 0) {
+      const sessionIds = sessions.map(s => s.session_id);
+      console.log(`   Session IDs: [${sessionIds.join(', ')}]`);
+    }
     setSessionList(sessions);
 
     if (preferredSessionId && sessions.some((session) => session.session_id === preferredSessionId)) {
+      console.log(`✅ Setting preferred session - session_id: ${preferredSessionId}`);
       setSessionId(preferredSessionId);
     }
   };
@@ -119,13 +125,16 @@ const Chatbot = () => {
     }
 
     try {
+      console.log(`📖 FETCHING HISTORY - session_id: ${activeSessionId} | user_id: ${activeUserId}`);
       const response = await chatbotFetch(`/chat/history/${activeSessionId}?user_id=${encodeURIComponent(activeUserId)}`);
       if (!response.ok) {
         throw new Error(`Failed to load chat history (${response.status})`);
       }
 
       const data = await response.json();
-      setMessages(mapApiMessagesToUi(data.messages));
+      const mappedMessages = mapApiMessagesToUi(data.messages);
+      console.log(`✅ HISTORY RENDERED - session_id: ${activeSessionId} | message count: ${mappedMessages.length}`);
+      setMessages(mappedMessages);
     } finally {
       if (showLoadingState) {
         setHistoryLoading(false);
@@ -134,32 +143,55 @@ const Chatbot = () => {
   };
 
   const createNewSession = async (activeUserId, shouldResetUi = true) => {
-    const response = await chatbotFetch('/chat/new-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ user_id: activeUserId })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to create new session (${response.status})`);
+    // ===== VALIDATE user_id =====
+    if (!activeUserId || typeof activeUserId !== 'string' || activeUserId.trim() === '') {
+      console.error("❌ Cannot create session: user_id is required and cannot be empty");
+      throw new Error("user_id is required. Please refresh the page and try again.");
     }
 
-    const data = await response.json();
-    const nextSessionId = data.session_id;
-    localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId);
-    setSessionId(nextSessionId);
+    console.log(`🔄 Creating new session for user: ${activeUserId}`);
 
-    if (shouldResetUi) {
-      setMessages([DEFAULT_WELCOME_MESSAGE]);
-      setInputMessage('');
-      if (synthesisRef.current) {
-        synthesisRef.current.cancel();
+    try {
+      const response = await chatbotFetch('/chat/new-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: activeUserId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Failed to create new session (${response.status}): ${errorData.error || 'Unknown error'}`);
       }
-    }
 
-    return nextSessionId;
+      const data = await response.json();
+      const nextSessionId = data.session_id;
+      
+      if (!nextSessionId) {
+        throw new Error("Server did not return a session_id");
+      }
+
+      // DEBUGGING: Print session_id in console
+      console.log(`✅ NEW SESSION CREATED - session_id: ${nextSessionId} | user_id: ${activeUserId}`);
+      
+      localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId);
+      setSessionId(nextSessionId);
+
+      if (shouldResetUi) {
+        console.log(`🔄 Resetting UI with new session - session_id: ${nextSessionId}`);
+        setMessages([DEFAULT_WELCOME_MESSAGE]);
+        setInputMessage('');
+        if (synthesisRef.current) {
+          synthesisRef.current.cancel();
+        }
+      }
+
+      return nextSessionId;
+    } catch (error) {
+      console.error("❌ Failed to create new session:", error);
+      throw error;
+    }
   };
 
   // ============================================================================
@@ -223,20 +255,25 @@ const Chatbot = () => {
         activeUserId = createClientId();
         localStorage.setItem(CHAT_USER_STORAGE_KEY, activeUserId);
       }
+      console.log(`👤 USER ID INITIALIZED - user_id: ${activeUserId}`);
       setUserId(activeUserId);
 
       try {
         const existingSessionId = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+        console.log(`🔍 CHECKING FOR EXISTING SESSION - found: ${existingSessionId ? 'YES' : 'NO'}`);
+        
         if (existingSessionId) {
+          console.log(`📖 LOADING EXISTING SESSION - session_id: ${existingSessionId}`);
           setSessionId(existingSessionId);
           await fetchAndRenderHistory(existingSessionId, activeUserId);
           await loadSessionList(activeUserId, existingSessionId);
         } else {
+          console.log(`🆕 NO EXISTING SESSION, CREATING NEW ONE - user_id: ${activeUserId}`);
           const createdSessionId = await createNewSession(activeUserId, true);
           await loadSessionList(activeUserId, createdSessionId);
         }
       } catch (error) {
-        console.error('Failed to initialize chat session:', error);
+        console.error('❌ Failed to initialize chat session:', error);
         setMessages([DEFAULT_WELCOME_MESSAGE]);
       }
     };
@@ -299,11 +336,14 @@ const Chatbot = () => {
     if (!userId || loading) return;
 
     try {
+      console.log(`📌 NEW CHAT BUTTON CLICKED - user_id: ${userId} | current session_id: ${sessionId}`);
       setLoading(true);
       const createdSessionId = await createNewSession(userId, true);
+      console.log(`✅ New session created - old session: ${sessionId} | new session: ${createdSessionId}`);
       await loadSessionList(userId, createdSessionId);
+      console.log(`📋 Session list loaded with new session selected`);
     } catch (error) {
-      console.error('Failed to create new chat session:', error);
+      console.error('❌ Failed to create new chat session:', error);
       setMessages((prev) => [
         ...prev,
         {
@@ -380,17 +420,22 @@ const Chatbot = () => {
       let assistantResponse = '';
       let activeSessionId = sessionId;
 
+      console.log(`📨 SENDING MESSAGE - user_id: ${userId} | session_id: ${activeSessionId} | message length: ${userMessage.text.length}`);
+
       if (userId && !activeSessionId) {
         try {
+          console.warn(`⚠️ No session_id found, creating new session - user_id: ${userId}`);
           activeSessionId = await createNewSession(userId, false);
           await loadSessionList(userId, activeSessionId);
+          console.log(`✅ Auto-created session - session_id: ${activeSessionId}`);
         } catch (sessionError) {
-          console.warn('Session creation failed, falling back to legacy chat:', sessionError);
+          console.warn('❌ Session creation failed, falling back to legacy chat:', sessionError);
         }
       }
 
       if (userId && activeSessionId) {
         try {
+          console.log(`📤 Calling /chat/send - user_id: ${userId} | session_id: ${activeSessionId}`);
           const response = await chatbotFetch('/chat/send', {
             method: 'POST',
             headers: {
@@ -411,12 +456,14 @@ const Chatbot = () => {
 
           const data = await response.json();
           assistantResponse = data.response;
+          console.log(`✅ MESSAGE SENT TO SESSION - session_id: ${activeSessionId} | response length: ${assistantResponse.length}`);
           await loadSessionList(userId, activeSessionId);
         } catch (persistentError) {
-          console.warn('Persistent chat failed, falling back to legacy chat:', persistentError);
+          console.warn('❌ Persistent chat failed, falling back to legacy chat:', persistentError);
           assistantResponse = await sendLegacyChatMessage(userMessage.text);
         }
       } else {
+        console.log(`ℹ️ Using legacy chat (no user_id or session_id)`);
         assistantResponse = await sendLegacyChatMessage(userMessage.text);
       }
 

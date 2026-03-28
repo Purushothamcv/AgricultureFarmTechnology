@@ -7,6 +7,91 @@ import { AlertTriangle, MapPin, Sprout, Map } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
+// ============================================
+// ENVIRONMENTAL DATA FETCHING HELPERS
+// ============================================
+
+/**
+ * Fetch weather data from Open-Meteo API
+ * Returns: temperature, humidity, rainfall, wind_speed
+ */
+async function fetchWeatherDataFromOpenMeteo(lat, lon) {
+  try {
+    const response = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relativehumidity_2m,precipitation,windspeed_10m&timezone=auto`
+    );
+    
+    if (!response.ok) throw new Error('Weather API failed');
+    
+    const data = await response.json();
+    
+    return {
+      temperature: data.current_weather.temperature || 25,
+      wind_speed: data.current_weather.windspeed || 10,
+      humidity: data.hourly?.relativehumidity_2m?.[0] || 60,
+      rainfall: data.hourly?.precipitation?.[0] || 50
+    };
+  } catch (error) {
+    console.error('❌ Error fetching weather from Open-Meteo:', error);
+    return {
+      temperature: 25,
+      wind_speed: 10,
+      humidity: 60,
+      rainfall: 50
+    };
+  }
+}
+
+/**
+ * Fetch elevation data from Open-Elevation API
+ * Returns: elevation in meters
+ */
+async function fetchElevationData(lat, lon) {
+  try {
+    const response = await fetch(
+      `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`
+    );
+    
+    if (!response.ok) throw new Error('Elevation API failed');
+    
+    const data = await response.json();
+    return data.results?.[0]?.elevation || 500;
+  } catch (error) {
+    console.error('❌ Error fetching elevation from Open-Elevation:', error);
+    return 500; // Default fallback
+  }
+}
+
+/**
+ * Fetch all environmental data for a location
+ */
+async function fetchAllEnvironmentalData(lat, lon) {
+  try {
+    // Fetch weather and elevation in parallel
+    const [weatherData, elevation] = await Promise.all([
+      fetchWeatherDataFromOpenMeteo(lat, lon),
+      fetchElevationData(lat, lon)
+    ]);
+    
+    return {
+      ...weatherData,
+      elevation: elevation,
+      water_flow: 50  // Default value - would need sensor data
+    };
+  } catch (error) {
+    console.error('❌ Error fetching environmental data:', error);
+    // Return defaults if everything fails
+    return {
+      temperature: 25,
+      humidity: 60,
+      rainfall: 50,
+      wind_speed: 10,
+      elevation: 500,
+      water_flow: 50
+    };
+  }
+}
+
 const StressPrediction = () => {
   const [formData, setFormData] = useState({
     // Manual Farmer Inputs
@@ -88,56 +173,41 @@ const StressPrediction = () => {
   const handleMapLocationSelect = async (lat, lng) => {
     setMapLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/stress/location-data`, {
-        latitude: lat,
-        longitude: lng
-      });
+      // Fetch environmental data from external APIs
+      const environmentalData = await fetchAllEnvironmentalData(lat, lng);
+      
+      // Update form with auto-filled environmental data
+      setFormData(prev => ({
+        ...prev,
+        // Environmental data (AUTO-FILLED, READ-ONLY)
+        temperature: environmentalData.temperature.toFixed(1),
+        humidity: environmentalData.humidity.toFixed(0),
+        rainfall: environmentalData.rainfall.toFixed(1),
+        wind_speed: environmentalData.wind_speed.toFixed(1),
+        elevation: environmentalData.elevation.toString(),
+        water_flow: environmentalData.water_flow.toString(),
+        
+        // Location
+        lat: lat.toString(),
+        lng: lng.toString()
+      }));
 
-      if (response.data.success) {
-        const data = response.data;
-        setLocationData(data);
-        
-        // Check if soil data was fetched
-        const hasSoilData = data.soil_pH || data.soil_moisture || data.elevation;
-        setSoilDataFetched(hasSoilData);
-        
-        // Auto-fill weather, location, and SOIL data
-        setFormData(prev => ({
-          ...prev,
-          // Weather data
-          temperature: data.temperature?.toFixed(1) || prev.temperature,
-          humidity: data.humidity?.toFixed(0) || prev.humidity,
-          rainfall: data.rainfall?.toFixed(1) || prev.rainfall,
-          wind_speed: data.wind_speed?.toFixed(1) || prev.wind_speed,
-          elevation: data.elevation?.toString() || prev.elevation,
-          water_flow: data.water_flow?.toString() || prev.water_flow,
-          drainage: data.drainage?.toString() || prev.drainage,
-          // Soil data (NEW)
-          soil_moisture: data.soil_moisture?.toFixed(1) || prev.soil_moisture,
-          soil_ph: data.soil_pH?.toFixed(2) || prev.soil_ph,
-          organic_matter: data.organic_matter?.toFixed(2) || prev.organic_matter,
-          // Location
-          lat: lat.toString(),
-          lng: lng.toString()
-        }));
-
-        setShowMap(false);
-        
-        // Build notification
-        let notification = 'Location data fetched!\nWeather data has been auto-filled.';
-        if (hasSoilData) {
-          notification += '\n\n✅ Soil data also fetched!';
-          if (data.soil_pH) notification += `\nSoil pH: ${data.soil_pH}`;
-          if (data.soil_moisture) notification += `\nSoil Moisture: ${data.soil_moisture.toFixed(1)}%`;
-          if (data.elevation) notification += `\nElevation: ${data.elevation}m`;
-        }
-        
-        alert(notification);
-      }
+      setLocationData(environmentalData);
+      setShowMap(false);
+      
+      // Build success notification
+      const notification = `✅ Location Data Fetched!\n\nWeather Information:\n` +
+        `🌡️ Temperature: ${environmentalData.temperature.toFixed(1)}°C\n` +
+        `💧 Humidity: ${environmentalData.humidity.toFixed(0)}%\n` +
+        `🌧️ Rainfall: ${environmentalData.rainfall.toFixed(1)}mm\n` +
+        `💨 Wind Speed: ${environmentalData.wind_speed.toFixed(1)}km/h\n` +
+        `⛰️ Elevation: ${environmentalData.elevation}m\n` +
+        `💦 Water Flow: ${environmentalData.water_flow}L/min`;
+      
+      alert(notification);
     } catch (err) {
-      console.error('Error fetching location data:', err);
-      alert('Failed to fetch location data. Please try again or enter manually.');
-      setSoilDataFetched(false);
+      console.error('Error fetching environmental data:', err);
+      alert('Failed to fetch environmental data. Please try again.');
     }
     setMapLoading(false);
   };
@@ -440,73 +510,91 @@ const StressPrediction = () => {
                     </div>
                   </div>
 
-                  {/* Environmental Factors (Auto-filled from location) */}
+                  {/* Environmental Factors (Auto-filled from location, READ-ONLY) */}
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <h3 className="text-sm font-semibold text-gray-800 mb-3">
-                      Environmental Factors (Auto-filled from location)
+                      🌍 Environmental Factors (Auto-filled from location - Read Only)
                     </h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <InputField
-                        label="Temperature (°C)"
-                        name="temperature"
-                        type="number"
-                        value={formData.temperature}
-                        onChange={handleChange}
-                        placeholder="Auto-filled"
-                        required
-                        step="0.1"
-                      />
-                      <InputField
-                        label="Humidity (%)"
-                        name="humidity"
-                        type="number"
-                        value={formData.humidity}
-                        onChange={handleChange}
-                        placeholder="Auto-filled"
-                        required
-                        step="0.1"
-                      />
-                      <InputField
-                        label="Rainfall (mm)"
-                        name="rainfall"
-                        type="number"
-                        value={formData.rainfall}
-                        onChange={handleChange}
-                        placeholder="Auto-filled"
-                        required
-                        step="0.1"
-                      />
-                      <InputField
-                        label="Wind Speed (km/h)"
-                        name="wind_speed"
-                        type="number"
-                        value={formData.wind_speed}
-                        onChange={handleChange}
-                        placeholder="Auto-filled"
-                        required
-                        step="0.1"
-                      />
-                      <InputField
-                        label="Elevation (m)"
-                        name="elevation"
-                        type="number"
-                        value={formData.elevation}
-                        onChange={handleChange}
-                        placeholder="500"
-                        required
-                        step="1"
-                      />
-                      <InputField
-                        label="Water Flow (L/min)"
-                        name="water_flow"
-                        type="number"
-                        value={formData.water_flow}
-                        onChange={handleChange}
-                        placeholder="50"
-                        required
-                        step="1"
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Temperature (°C)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.temperature}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="0.1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Humidity (%)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.humidity}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="0.1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Rainfall (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.rainfall}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="0.1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Wind Speed (km/h)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.wind_speed}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="0.1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Elevation (m)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.elevation}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Water Flow (L/min)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.water_flow}
+                          disabled
+                          placeholder="Auto-filled"
+                          step="1"
+                          className="input-field bg-gray-100 cursor-not-allowed opacity-75"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -613,6 +701,56 @@ const StressPrediction = () => {
                             <div key={idx} className="bg-white p-3 rounded-md">
                               <p className="text-sm font-semibold text-blue-700">{rec.factor}</p>
                               <p className="text-xs text-gray-600 mt-1">{rec.action}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI-Powered Explanation (NEW) */}
+                    {result.enhanced_with_ai && result.ai_explanation && (
+                      <div className="card bg-purple-50 border border-purple-200">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                          <span className="text-lg mr-2">🧠</span>
+                          AI Expert Analysis
+                        </h4>
+                        <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                          {result.ai_explanation}
+                        </p>
+                        <div className="text-xs text-purple-600 italic">
+                          Powered by {result.reasoning_source || 'Groq LLM'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Recommendations (NEW) */}
+                    {result.enhanced_with_ai && result.ai_recommendations && result.ai_recommendations.length > 0 && (
+                      <div className="card bg-orange-50 border border-orange-200">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                          <span className="text-lg mr-2">💡</span>
+                          Expert Recommendations
+                        </h4>
+                        <div className="space-y-2">
+                          {result.ai_recommendations.map((rec, idx) => (
+                            <div key={idx} className="bg-white p-2 rounded-md border-l-3 border-orange-400">
+                              <div className="flex items-start justify-between">
+                                <p className="text-xs font-semibold text-gray-800">
+                                  {rec.action}
+                                </p>
+                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                                  rec.priority === 'URGENT' ? 'bg-red-100 text-red-700' :
+                                  rec.priority === 'High' ? 'bg-yellow-100 text-yellow-700' :
+                                  rec.priority === 'Medium' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {rec.priority}
+                                </span>
+                              </div>
+                              {rec.factor && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <span className="font-medium">Factor:</span> {rec.factor}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
