@@ -28,7 +28,7 @@ import sys
 # Add model directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from model.fruit_disease_detector import FruitDiseaseDetector
+from .model.fruit_disease_detector import FruitDiseaseDetector
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

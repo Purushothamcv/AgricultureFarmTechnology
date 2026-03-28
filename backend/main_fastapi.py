@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-print("🔥 SmartAgri-AI Backend starting...")
+print("[INFO] SmartAgri-AI Backend starting...")
 
 from .utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
 from .auth import router as auth_router
@@ -39,7 +39,7 @@ from .soil_data_service import get_soil_data_service
 from .stress_agent import generate_stress_insights
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
-print("✅ FastAPI app instance created")
+print("[CREATED] FastAPI app instance ready")
 app.add_event_handler("startup", agentic_ai_startup)
 
 # Event handlers for MongoDB connection

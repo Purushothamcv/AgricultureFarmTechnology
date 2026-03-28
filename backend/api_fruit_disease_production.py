@@ -37,7 +37,7 @@ from PIL import Image
 from pathlib import Path
 
 # Import production inference engine
-from model.production_inference import (
+from .model.production_inference import (
     get_inference_engine,
     predict_fruit_disease,
     predict_fruit_disease_batch

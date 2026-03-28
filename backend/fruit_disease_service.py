@@ -25,7 +25,7 @@ import sys
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from model.fruit_disease_inference import FruitDiseasePredictor
+from .model.fruit_disease_inference import FruitDiseasePredictor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
