@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from groq import Groq
 import logging
 from dotenv import load_dotenv
-from database import get_database
+from .database import get_database
 
 # Load environment variables from .env file
 load_dotenv()

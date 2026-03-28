@@ -14,9 +14,9 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import os
 import urllib.parse
-from models import UserRegister, UserLogin, UserResponse, LoginResponse, MessageResponse, GoogleAuthRequest, TokenResponse
+from .models import UserRegister, UserLogin, UserResponse, LoginResponse, MessageResponse, GoogleAuthRequest, TokenResponse
 # Import from central MongoDB Atlas connection
-from db import users_collection
+from .db import users_collection
 
 # Initialize router
 router = APIRouter(prefix="/auth", tags=["Authentication"])

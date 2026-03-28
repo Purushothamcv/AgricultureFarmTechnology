@@ -6,34 +6,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import pandas as pd
-from utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
-from auth import router as auth_router
-from database import connect_to_mongodb, close_mongodb_connection, get_database
-from db_helpers import get_database_stats
-from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse, WeatherAndPHDataResponse
-from crop_service import predict_crop, fetch_all_location_data, fetch_weather_and_ph_only
-from fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
+from .utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
+from .auth import router as auth_router
+from .database import connect_to_mongodb, close_mongodb_connection, get_database
+from .db_helpers import get_database_stats
+from .crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse, WeatherAndPHDataResponse
+from .crop_service import predict_crop, fetch_all_location_data, fetch_weather_and_ph_only
+from .fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
 # Import PRODUCTION fruit disease API (frozen model, inference-only)
-from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
+from .api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
 # Import NEW V2 API (clean trained model - 92%+ accuracy)
-from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
+from .fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
 # Import Plant Leaf Disease Detection Service
-from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
+from .plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
 # Import AI Chatbot Service
-from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
+from .chatbot_service import router as chatbot_router, startup_event as chatbot_startup
 # Import Yield Prediction Service (APY Dataset-based)
-from yield_prediction_service import get_yield_service, startup_event as yield_startup
+from .yield_prediction_service import get_yield_service, startup_event as yield_startup
 # Import Agentic AI Crop Service
-from agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
+from .agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
 # Import Fertilizer Prediction Service (Dataset-based ML)
-from fertilizer_prediction_service import get_fertilizer_service
-from fertilizer_auto_fill_service import get_fertilizer_auto_fill_service
+from .fertilizer_prediction_service import get_fertilizer_service
+from .fertilizer_auto_fill_service import get_fertilizer_auto_fill_service
 # Import Stress Prediction Service (Simplified Farmer-Friendly Model)
-from stress_prediction_service import stress_service
+from .stress_prediction_service import stress_service
 # Import Soil Data Service (External API Integration for Map)
-from soil_data_service import get_soil_data_service
+from .soil_data_service import get_soil_data_service
 # Import Stress Agent (Agentic AI for explanations and recommendations)
-from stress_agent import generate_stress_insights
+from .stress_agent import generate_stress_insights
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 app.add_event_handler("startup", agentic_ai_startup)

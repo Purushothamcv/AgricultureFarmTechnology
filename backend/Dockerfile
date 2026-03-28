@@ -39,4 +39,5 @@ EXPOSE 8000
 # Uses shell form to properly expand PORT environment variable
 # Render provides PORT dynamically, defaults to 8000 for local dev
 # WEB_CONCURRENCY controls number of workers (Render sets this based on available CPUs)
-CMD sh -c "uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"
+# Using python -m ensures proper package handling for relative imports
+CMD sh -c "python -m uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"
