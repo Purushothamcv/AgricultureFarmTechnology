@@ -16,16 +16,16 @@ Date: 2026-01-21
 import os
 import io
 import logging
+import sys
 from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
-import sys
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add backend directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from .model.fruit_disease_inference import FruitDiseasePredictor
+from model.fruit_disease_inference import FruitDiseasePredictor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

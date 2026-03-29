@@ -3,7 +3,11 @@ Database Helper Functions for FinalProject Collections
 Provides utility functions to interact with MongoDB collections
 """
 
-from .database import get_database
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from database import get_database
 from datetime import datetime
 from typing import Dict, Any, Optional
 

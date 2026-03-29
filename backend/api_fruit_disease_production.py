@@ -35,9 +35,14 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 from PIL import Image
 from pathlib import Path
+import sys
+import os
+
+# Add backend directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import production inference engine
-from .model.production_inference import (
+from model.production_inference import (
     get_inference_engine,
     predict_fruit_disease,
     predict_fruit_disease_batch

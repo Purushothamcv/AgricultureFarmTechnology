@@ -24,11 +24,12 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 from PIL import Image
 import sys
+import os
 
-# Add model directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add backend directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from .model.fruit_disease_detector import FruitDiseaseDetector
+from model.fruit_disease_detector import FruitDiseaseDetector
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

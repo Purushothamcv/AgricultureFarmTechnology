@@ -12,15 +12,17 @@ Features:
 
 import os
 import json
+import sys
+import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from groq import Groq
-import logging
 from dotenv import load_dotenv
-from .database import get_database
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from database import get_database
 
 # Load environment variables from .env file
 load_dotenv()
