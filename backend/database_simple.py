@@ -22,11 +22,8 @@ load_dotenv()
 # CONFIGURATION
 # ============================================================================
 
-# Primary: MongoDB Atlas
+# MongoDB Atlas (REQUIRED - NO LOCALHOST FALLBACK FOR RENDER)
 MONGODB_ATLAS_URL = "mongodb+srv://Purushotham:Purushotham123@cluster0.bpdrfrc.mongodb.net/?retryWrites=true&w=majority"
-
-# Fallback: Local MongoDB
-MONGODB_LOCAL_URL = "mongodb://localhost:27017"
 
 # Get from .env or use Atlas as default
 MONGODB_URL = os.getenv("MONGODB_URL", MONGODB_ATLAS_URL)
@@ -49,59 +46,47 @@ chatbot_db: AsyncIOMotorDatabase = None
 
 async def connect_to_mongodb():
     """
-    Establish connection to MongoDB
-    Tries Atlas first, then falls back to local MongoDB
+    Establish connection to MongoDB Atlas
+    Uses MONGODB_URL from environment or defaults to Atlas connection string
     """
     global client, users_db, chatbot_db
     
     logger.info("🔌 Attempting MongoDB connection...")
+    logger.info(f"Using URL: {MONGODB_URL[:50]}...")
     
-    # Try original URL first
-    urls_to_try = [MONGODB_URL]
-    
-    # If using Atlas and it fails, try local as fallback
-    if "mongodb+srv" in MONGODB_URL:
-        urls_to_try.append(MONGODB_LOCAL_URL)
-    
-    for attempt_url in urls_to_try:
-        try:
-            logger.info(f"⏳ Trying: {attempt_url[:30]}...")
-            
-            # Connect with timeout
-            client = AsyncIOMotorClient(
-                attempt_url,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000,
-                socketTimeoutMS=5000
-            )
-            
-            # Test connection with ping
-            await asyncio.wait_for(
-                client.admin.command('ping'),
-                timeout=5.0
-            )
-            
-            # Initialize databases
-            users_db = client[USERS_DATABASE_NAME]
-            chatbot_db = client[CHATBOT_DATABASE_NAME]
-            
-            # Create indexes
-            await create_indexes()
-            
-            logger.info(f"✅ MongoDB connected successfully!")
-            logger.info(f"   URL: {attempt_url[:40]}...")
-            logger.info(f"   Users DB: {USERS_DATABASE_NAME}")
-            logger.info(f"   Chatbot DB: {CHATBOT_DATABASE_NAME}")
-            
-            return True
-            
-        except Exception as e:
-            logger.warning(f"❌ Failed: {type(e).__name__}: {str(e)[:100]}")
-            continue
-    
-    logger.error("❌ Could not connect to any MongoDB instance")
-    logger.error("   Install local MongoDB and try again")
-    raise Exception("MongoDB connection failed - install local MongoDB")
+    try:
+        # Connect to MongoDB Atlas with timeout
+        client = AsyncIOMotorClient(
+            MONGODB_URL,
+            serverSelectionTimeoutMS=30000,  # 30 seconds for server discovery
+            connectTimeoutMS=30000,
+            socketTimeoutMS=60000
+        )
+        
+        # Test connection with ping
+        await asyncio.wait_for(
+            client.admin.command('ping'),
+            timeout=10.0
+        )
+        
+        # Initialize databases
+        users_db = client[USERS_DATABASE_NAME]
+        chatbot_db = client[CHATBOT_DATABASE_NAME]
+        
+        # Create indexes
+        await create_indexes()
+        
+        logger.info(f"✅ MongoDB connected successfully!")
+        logger.info(f"   Users DB: {USERS_DATABASE_NAME}")
+        logger.info(f"   Chatbot DB: {CHATBOT_DATABASE_NAME}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {type(e).__name__}: {str(e)}")
+        logger.error("❌ Could not connect to MongoDB Atlas")
+        logger.error("   Ensure MONGODB_URL environment variable is set correctly")
+        raise Exception("MongoDB Atlas connection failed - check MONGODB_URL")
 
 
 async def create_indexes():

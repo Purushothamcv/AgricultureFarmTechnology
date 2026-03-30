@@ -389,7 +389,7 @@ def test_mongodb_connection():
                 "users": "accessible",
                 "chat_sessions": "accessible"
             },
-            "details": "G£ô PyMongo synchronous connection working"
+            "details": "PyMongo synchronous connection working"
         }
     except Exception as e:
         return {
@@ -1007,7 +1007,7 @@ def get_fertilizer_location_data(data: dict):
                 
                 print(f"[OK] Soil data fetched: pH={result['soil_pH']}, Type={result['soil_type']}, Elevation={result['elevation']}m")
         except Exception as e:
-            print(f"GÜán+Å Failed to fetch soil data: {e}")
+            print(f"Gï¿½ï¿½n+ï¿½ Failed to fetch soil data: {e}")
             # Continue without soil data - user can enter manually
         
         # 1. Reverse Geocoding using Nominatim (OpenStreetMap)
@@ -1140,7 +1140,7 @@ def get_fertilizer_location_data(data: dict):
                     rain_data = weather_data.get('rain', {})
                     result['rainfall'] = rain_data.get('1h', 0) or rain_data.get('3h', 0) or 0
                     
-                    print(f"[OK] Weather data fetched: Temp={result['temperature']}-¦C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
+                    print(f"[OK] Weather data fetched: Temp={result['temperature']}-ï¿½C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
                 else:
                     print(f"[ERROR] Weather API failed: Status {weather_response.status_code}")
                     print(f"Response: {weather_response.text[:200]}")
@@ -1205,7 +1205,7 @@ def api_predict_stress(data: dict):
             return ml_prediction
         
         # Step 2: Generate AI-powered explanation and recommendations
-        print("=ƒºá Generating AI insights using Groq LLM...")
+        print("=ï¿½ï¿½ï¿½ Generating AI insights using Groq LLM...")
         try:
             ai_insights = generate_stress_insights(data, ml_prediction)
             
@@ -1323,9 +1323,9 @@ def api_recommend_spray_time(data: SprayRequest):
     issues = []
     
     if temperature > 30:
-        issues.append("Temperature too high (>30-¦C)")
+        issues.append("Temperature too high (>30-ï¿½C)")
     if temperature < 10:
-        issues.append("Temperature too low (<10-¦C)")
+        issues.append("Temperature too low (<10-ï¿½C)")
     if humidity < 50:
         issues.append("Humidity too low (<50%)")
     if windSpeed > 15:
