@@ -51,14 +51,14 @@ app.add_event_handler("startup", agentic_ai_startup)
 @app.on_event("startup")
 async def startup_event():
     """Initialize MongoDB connection and ML models on application startup"""
-    print("🚀 Starting SmartAgri API...")
+    print("[START] Starting SmartAgri API...")
     
     # MongoDB connection with error handling - don't block startup if it fails
     try:
         await connect_to_mongodb()
     except Exception as e:
-        print(f"⚠️  MongoDB connection failed: {e}")
-        print("⚠️  Continuing startup - database operations will fail until connection restored")
+        print(f"[WARN] MongoDB connection failed: {e}")
+        print("[WARN] Continuing startup - database operations will fail until connection restored")
     
     # Initialize each service with error handling
     # If a service fails, log it but continue with others
@@ -66,31 +66,31 @@ async def startup_event():
     try:
         await fruit_startup()
     except Exception as e:
-        print(f"⚠️  Fruit disease service (legacy) failed to start: {e}")
+        print(f"[WARN] Fruit disease service (legacy) failed to start: {e}")
     
     try:
-        print("🔬 Initializing Production Fruit Disease Detection...")
+        print("[INIT] Initializing Production Fruit Disease Detection...")
         await fruit_prod_startup()
     except Exception as e:
-        print(f"⚠️  Production fruit disease service failed to start: {e}")
+        print(f"[WARN] Production fruit disease service failed to start: {e}")
     
     try:
-        print("🍎 Initializing Fruit Disease V2 (Clean Model)...")
+        print("[INIT] Initializing Fruit Disease V2 (Clean Model)...")
         await fruit_v2_startup()
     except Exception as e:
-        print(f"⚠️  Fruit Disease V2 service failed to start: {e}")
+        print(f"[WARN] Fruit Disease V2 service failed to start: {e}")
     
     try:
-        print("🌿 Initializing Plant Leaf Disease Detection...")
+        print("[INIT] Initializing Plant Leaf Disease Detection...")
         await plant_disease_startup()
     except Exception as e:
-        print(f"⚠️  Plant disease service failed to start: {e}")
+        print(f"[WARN] Plant disease service failed to start: {e}")
     
     try:
-        print("🤖 Initializing AI Chatbot Service...")
+        print("[INIT] Initializing AI Chatbot Service...")
         await chatbot_startup()
     except Exception as e:
-        print(f"⚠️  Chatbot service failed to start: {e}")
+        print(f"[WARN] Chatbot service failed to start: {e}")
     
     try:
         await yield_startup()
@@ -98,18 +98,18 @@ async def startup_event():
         print(f"⚠️  Yield service failed to start: {e}")
 
     try:
-        print("🌱 Initializing Fertilizer Prediction Service...")
+        print("[INIT] Initializing Fertilizer Prediction Service...")
         fertilizer_service = get_fertilizer_service()
         fertilizer_service.load_model()
     except Exception as e:
-        print(f"⚠️  Fertilizer service failed to start: {e}")
+        print(f"[WARN] Fertilizer service failed to start: {e}")
     
-    print("✅ Startup complete - API ready to accept requests")
+    print("[OK] Startup complete - API ready to accept requests")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close MongoDB connection on application shutdown"""
-    print("🛑 Shutting down SmartAgri API...")
+    print("[SHUTDOWN] Shutting down SmartAgri API...")
     await close_mongodb_connection()
 
 # Configure CORS
@@ -128,7 +128,7 @@ allowed_origins = [
     "https://*.onrender.com",  # Allow any Render frontend deployment
 ]
 
-print(f"🌐 CORS enabled for origins: {allowed_origins}")
+print(f"[CORS] CORS enabled for origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -633,9 +633,9 @@ async def get_yield_crops_by_state(state: str):
     """
     try:
         service = get_yield_service()
-        print(f"🌾 API request /yield/crops/{{state}} => {state}")
+        print(f"[API] API request /yield/crops/{{state}} => {state}")
         crops = service.get_crops_by_state(state)
-        print(f"🌾 API response crop count => {len(crops)}")
+        print(f"[API] API response crop count => {len(crops)}")
 
         if not crops:
             return {
@@ -828,7 +828,7 @@ def get_fertilizer_location_data(data: dict):
         
         # Fetch soil data from external APIs (SoilGrids, OpenElevation, etc.)
         try:
-            print(f"🌍 Fetching soil data for coordinates: {lat}, {lng}")
+            print(f"[DATA] Fetching soil data for coordinates: {lat}, {lng}")
             soil_service = get_soil_data_service()
             soil_data = soil_service.get_soil_data(lat, lng)
             
@@ -839,7 +839,7 @@ def get_fertilizer_location_data(data: dict):
                     if soil_data.get(key) is not None:
                         result[key] = soil_data[key]
                 
-                print(f"✅ Soil data fetched: pH={result['soil_pH']}, Type={result['soil_type']}, Elevation={result['elevation']}m")
+                print(f"[OK] Soil data fetched: pH={result['soil_pH']}, Type={result['soil_type']}, Elevation={result['elevation']}m")
         except Exception as e:
             print(f"⚠️ Failed to fetch soil data: {e}")
             # Continue without soil data - user can enter manually
@@ -931,9 +931,9 @@ def get_fertilizer_location_data(data: dict):
                     result['region'] = state_to_region.get(state, 'Central')
                 
         except requests.Timeout:
-            print("⚠️ Geocoding timeout")
+            print("[TIMEOUT] Geocoding timeout")
         except Exception as e:
-            print(f"⚠️ Geocoding error: {e}")
+            print(f"[WARN] Geocoding error: {e}")
         
         # 2. Fetch Weather Data using OpenWeatherMap API (if API key available)
         try:
@@ -941,8 +941,8 @@ def get_fertilizer_location_data(data: dict):
             import os
             weather_api_key = os.getenv('OPENWEATHER_API_KEY', '90e50f067196b6d46932c52869d83ed6')
             
-            print(f"🌤️  Attempting to fetch weather data for: {lat}, {lng}")
-            print(f"🔑 Using API key: {weather_api_key[:10]}...")
+            print(f"[WEATHER] Attempting to fetch weather data for: {lat}, {lng}")
+            print(f"[AUTH] Using API key: {weather_api_key[:10]}...")
             
             if weather_api_key:
                 weather_url = "https://api.openweathermap.org/data/2.5/weather"
@@ -959,7 +959,7 @@ def get_fertilizer_location_data(data: dict):
                     timeout=10
                 )
                 
-                print(f"🌐 Weather API Response Status: {weather_response.status_code}")
+                print(f"[API] Weather API Response Status: {weather_response.status_code}")
                 
                 if weather_response.status_code == 200:
                     weather_data = weather_response.json()
@@ -974,15 +974,15 @@ def get_fertilizer_location_data(data: dict):
                     rain_data = weather_data.get('rain', {})
                     result['rainfall'] = rain_data.get('1h', 0) or rain_data.get('3h', 0) or 0
                     
-                    print(f"✅ Weather data fetched: Temp={result['temperature']}°C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
+                    print(f"[OK] Weather data fetched: Temp={result['temperature']}°C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
                 else:
-                    print(f"❌ Weather API failed: Status {weather_response.status_code}")
+                    print(f"[ERROR] Weather API failed: Status {weather_response.status_code}")
                     print(f"Response: {weather_response.text[:200]}")
                     
         except requests.Timeout:
-            print("⚠️ Weather API timeout - request took longer than 10 seconds")
+            print("[TIMEOUT] Weather API timeout - request took longer than 10 seconds")
         except Exception as e:
-            print(f"⚠️ Weather API error: {e}")
+            print(f"[WARN] Weather API error: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1031,7 +1031,7 @@ def api_predict_stress(data: dict):
                     data.setdefault('wind_speed', weather.get('wind', 10))
         
         # Step 1: Get ML model prediction
-        print("🤖 Running ML model prediction...")
+        print("[ML] Running ML model prediction...")
         ml_prediction = stress_service.predict(data)
         
         # Check if ML prediction was successful
@@ -1052,7 +1052,7 @@ def api_predict_stress(data: dict):
                 "enhanced_with_ai": True
             }
         except Exception as e:
-            print(f"⚠️ AI explanation generation failed: {e}")
+            print(f"[WARN] AI explanation generation failed: {e}")
             # Return ML prediction without AI enhancement if LLM fails
             result = {
                 **ml_prediction,
@@ -1062,11 +1062,11 @@ def api_predict_stress(data: dict):
                 "enhanced_with_ai": False
             }
         
-        print("✅ Stress prediction with AI insights complete")
+        print("[OK] Stress prediction with AI insights complete")
         return result
         
     except Exception as e:
-        print(f"❌ Stress prediction error: {e}")
+        print(f"[ERROR] Stress prediction error: {e}")
         return {
             "success": False,
             "error": str(e)
@@ -1110,7 +1110,7 @@ async def get_stress_location_data(data: dict):
         
         # Fetch soil data from external APIs
         try:
-            print(f"🌍 Fetching soil data for stress prediction: {lat}, {lng}")
+            print(f"[DATA] Fetching soil data for stress prediction: {lat}, {lng}")
             soil_service = get_soil_data_service()
             soil_data = soil_service.get_soil_data(lat, lng)
             
@@ -1120,9 +1120,9 @@ async def get_stress_location_data(data: dict):
                 result["organic_matter"] = soil_data.get("organic_matter")
                 result["elevation"] = soil_data.get("elevation")
                 
-                print(f"✅ Soil data for stress: pH={result['soil_pH']}, Moisture={result['soil_moisture']}")
+                print(f"[OK] Soil data for stress: pH={result['soil_pH']}, Moisture={result['soil_moisture']}")
         except Exception as e:
-            print(f"⚠️ Failed to fetch soil data for stress: {e}")
+            print(f"[WARN] Failed to fetch soil data for stress: {e}")
         
         # Fetch weather data
         weather = fetch_weather_data(lat, lng)
@@ -1140,7 +1140,7 @@ async def get_stress_location_data(data: dict):
         return result
         
     except Exception as e:
-        print(f"❌ Location data error: {e}")
+        print(f"[ERROR] Location data error: {e}")
         return {
             "success": False,
             "error": str(e)

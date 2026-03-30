@@ -12,9 +12,9 @@ import joblib
 # Load the trained crop recommendation model
 try:
     crop_model = joblib.load("model/crop_model.pkl")
-    print("✅ Crop model loaded successfully")
+    print("[OK] Crop model loaded successfully")
 except Exception as e:
-    print(f"❌ Error loading crop model: {e}")
+    print(f"[ERROR] Error loading crop model: {e}")
     crop_model = None
 
 

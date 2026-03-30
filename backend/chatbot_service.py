@@ -10,10 +10,10 @@ Features:
 - Integration with existing agricultural data
 """
 
+import logging
 import os
 import json
 import sys
-import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from groq import Groq
 from dotenv import load_dotenv
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from database import get_database
 
