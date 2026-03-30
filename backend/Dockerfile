@@ -36,7 +36,6 @@ EXPOSE 8000
 # Render has its own health check mechanism
 
 # Run application with uvicorn in production mode
-# Uses shell form to properly expand PORT environment variable
-# Render provides PORT dynamically, defaults to 8000 for local dev
-# WEB_CONCURRENCY controls number of workers (Render sets this based on available CPUs)
-CMD sh -c "python -m uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"
+# Render provides PORT dynamically, bind to all interfaces
+# Use explicit port from PORT env var, fallback to 8000
+CMD ["sh", "-c", "python -m uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000}"]

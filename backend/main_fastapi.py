@@ -12,50 +12,138 @@ import os
 # Add backend directory to path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# ============================================
+# CRITICAL: LOG EARLY FOR RENDER DEBUGGING
+# ============================================
+print("\n" + "="*60)
+print("[START] SmartAgri-AI FastAPI Backend Initialization")
+print("="*60)
+print(f"[DEBUG] Python Path: {sys.path[:2]}")
+print(f"[DEBUG] Current Directory: {os.getcwd()}")
+print(f"[DEBUG] Main File Location: {os.path.abspath(__file__)}")
+print(f"[DEBUG] PORT env var: {os.environ.get('PORT', 'Not set (will use 8000)')}")
+print("="*60 + "\n")
+
 print("[INFO] SmartAgri-AI Backend starting...")
 
+# ============================================
+# SAFE IMPORTS WITH ERROR HANDLING
+# ============================================
+# Always import core dependencies first
 from utils import fetch_weather_data, get_hourly_forecast, recommend_fertilizer, predict_stress_level
 from auth import router as auth_router
 from database import connect_to_mongodb, close_mongodb_connection, get_database
 from db_helpers import get_database_stats
 from crop_models import ManualCropInput, LocationCropInput, CropPredictionResponse, LocationDataResponse, WeatherAndPHDataResponse
 from crop_service import predict_crop, fetch_all_location_data, fetch_weather_and_ph_only
-from fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
-# Import PRODUCTION fruit disease API (frozen model, inference-only)
-from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
-# Import NEW V2 API (clean trained model - 92%+ accuracy)
-from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
-# Import Plant Leaf Disease Detection Service
-from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
-# Import AI Chatbot Service
-from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
-# Import Yield Prediction Service (APY Dataset-based)
-from yield_prediction_service import get_yield_service, startup_event as yield_startup
-# Import Agentic AI Crop Service
-from agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
-# Import Fertilizer Prediction Service (Dataset-based ML)
-from fertilizer_prediction_service import get_fertilizer_service
-from fertilizer_auto_fill_service import get_fertilizer_auto_fill_service
-# Import Stress Prediction Service (Simplified Farmer-Friendly Model)
-from stress_prediction_service import stress_service
-# Import Soil Data Service (External API Integration for Map)
-from soil_data_service import get_soil_data_service
-# Import Stress Agent (Agentic AI for explanations and recommendations)
-from stress_agent import generate_stress_insights
+
+# Import services with fallbacks
+try:
+    from fruit_disease_service import router as fruit_disease_router, startup_event as fruit_startup
+    print("[OK] Fruit disease service imported")
+except ImportError as e:
+    print(f"[SKIP] Fruit disease service not available: {e}")
+    fruit_disease_router = None
+    fruit_startup = None
+
+try:
+    from api_fruit_disease_production import router as fruit_disease_prod_router, startup_event as fruit_prod_startup
+    print("[OK] Production fruit disease API imported")
+except ImportError as e:
+    print(f"[SKIP] Production fruit disease API not available: {e}")
+    fruit_disease_prod_router = None
+    fruit_prod_startup = None
+
+try:
+    from fruit_disease_api_v2 import router as fruit_disease_v2_router, startup_event as fruit_v2_startup
+    print("[OK] Fruit disease V2 API imported")
+except ImportError as e:
+    print(f"[SKIP] Fruit disease V2 API not available: {e}")
+    fruit_disease_v2_router = None
+    fruit_v2_startup = None
+
+try:
+    from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
+    print("[OK] Plant disease service imported")
+except ImportError as e:
+    print(f"[SKIP] Plant disease service not available: {e}")
+    plant_disease_router = None
+    plant_disease_startup = None
+
+try:
+    from chatbot_service import router as chatbot_router, startup_event as chatbot_startup
+    print("[OK] Chatbot service imported")
+except ImportError as e:
+    print(f"[SKIP] Chatbot service not available: {e}")
+    chatbot_router = None
+    chatbot_startup = None
+
+try:
+    from yield_prediction_service import get_yield_service, startup_event as yield_startup
+    print("[OK] Yield prediction service imported")
+except ImportError as e:
+    print(f"[SKIP] Yield prediction service not available: {e}")
+    yield_startup = None
+
+try:
+    from agentic_ai import router as agentic_router, startup_event as agentic_ai_startup
+    print("[OK] Agentic AI service imported")
+except ImportError as e:
+    print(f"[SKIP] Agentic AI service not available: {e}")
+    agentic_router = None
+    agentic_ai_startup = None
+
+try:
+    from fertilizer_prediction_service import get_fertilizer_service
+    print("[OK] Fertilizer prediction service imported")
+except ImportError as e:
+    print(f"[SKIP] Fertilizer prediction service not available: {e}")
+    get_fertilizer_service = None
+
+try:
+    from fertilizer_auto_fill_service import get_fertilizer_auto_fill_service
+    print("[OK] Fertilizer auto-fill service imported")
+except ImportError as e:
+    print(f"[SKIP] Fertilizer auto-fill service not available: {e}")
+    get_fertilizer_auto_fill_service = None
+
+try:
+    from stress_prediction_service import stress_service
+    print("[OK] Stress prediction service imported")
+except ImportError as e:
+    print(f"[SKIP] Stress prediction service not available: {e}")
+    stress_service = None
+
+try:
+    from soil_data_service import get_soil_data_service
+    print("[OK] Soil data service imported")
+except ImportError as e:
+    print(f"[SKIP] Soil data service not available: {e}")
+    get_soil_data_service = None
+
+try:
+    from stress_agent import generate_stress_insights
+    print("[OK] Stress agent imported")
+except ImportError as e:
+    print(f"[SKIP] Stress agent not available: {e}")
+    generate_stress_insights = None
+
+print("[INFO] All imports successful")
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
-print("[CREATED] FastAPI app instance ready")
-app.add_event_handler("startup", agentic_ai_startup)
+print("[INFO] FastAPI app instance created and ready to bind")
+print("[INFO] Backend is now listening for connections\n")
 
 # Event handlers for MongoDB connection
 @app.on_event("startup")
 async def startup_event():
     """Initialize MongoDB connection and ML models on application startup"""
-    print("[START] Starting SmartAgri API...")
+    print("\n[START] Starting SmartAgri API initialization...\n")
     
     # MongoDB connection with error handling - don't block startup if it fails
     try:
         await connect_to_mongodb()
+        print("[OK] MongoDB Connected")
     except Exception as e:
         print(f"[WARN] MongoDB connection failed: {e}")
         print("[WARN] Continuing startup - database operations will fail until connection restored")
@@ -63,48 +151,70 @@ async def startup_event():
     # Initialize each service with error handling
     # If a service fails, log it but continue with others
     
-    try:
-        await fruit_startup()
-    except Exception as e:
-        print(f"[WARN] Fruit disease service (legacy) failed to start: {e}")
+    if fruit_startup:
+        try:
+            await fruit_startup()
+            print("[OK] Fruit disease service (legacy) initialized")
+        except Exception as e:
+            print(f"[WARN] Fruit disease service (legacy) failed: {e}")
     
-    try:
-        print("[INIT] Initializing Production Fruit Disease Detection...")
-        await fruit_prod_startup()
-    except Exception as e:
-        print(f"[WARN] Production fruit disease service failed to start: {e}")
+    if fruit_prod_startup:
+        try:
+            print("[INIT] Initializing Production Fruit Disease Detection...")
+            await fruit_prod_startup()
+            print("[OK] Production fruit disease service initialized")
+        except Exception as e:
+            print(f"[WARN] Production fruit disease service failed: {e}")
     
-    try:
-        print("[INIT] Initializing Fruit Disease V2 (Clean Model)...")
-        await fruit_v2_startup()
-    except Exception as e:
-        print(f"[WARN] Fruit Disease V2 service failed to start: {e}")
+    if fruit_v2_startup:
+        try:
+            print("[INIT] Initializing Fruit Disease V2 (Clean Model)...")
+            await fruit_v2_startup()
+            print("[OK] Fruit Disease V2 service initialized")
+        except Exception as e:
+            print(f"[WARN] Fruit Disease V2 service failed: {e}")
     
-    try:
-        print("[INIT] Initializing Plant Leaf Disease Detection...")
-        await plant_disease_startup()
-    except Exception as e:
-        print(f"[WARN] Plant disease service failed to start: {e}")
+    if plant_disease_startup:
+        try:
+            print("[INIT] Initializing Plant Leaf Disease Detection...")
+            await plant_disease_startup()
+            print("[OK] Plant disease service initialized")
+        except Exception as e:
+            print(f"[WARN] Plant disease service failed: {e}")
     
-    try:
-        print("[INIT] Initializing AI Chatbot Service...")
-        await chatbot_startup()
-    except Exception as e:
-        print(f"[WARN] Chatbot service failed to start: {e}")
+    if chatbot_startup:
+        try:
+            print("[INIT] Initializing AI Chatbot Service...")
+            await chatbot_startup()
+            print("[OK] Chatbot service initialized")
+        except Exception as e:
+            print(f"[WARN] Chatbot service failed: {e}")
     
-    try:
-        await yield_startup()
-    except Exception as e:
-        print(f"âš ï¸  Yield service failed to start: {e}")
+    if yield_startup:
+        try:
+            await yield_startup()
+            print("[OK] Yield prediction service initialized")
+        except Exception as e:
+            print(f"[WARN] Yield service failed: {e}")
 
-    try:
-        print("[INIT] Initializing Fertilizer Prediction Service...")
-        fertilizer_service = get_fertilizer_service()
-        fertilizer_service.load_model()
-    except Exception as e:
-        print(f"[WARN] Fertilizer service failed to start: {e}")
+    if agentic_ai_startup:
+        try:
+            print("[INIT] Initializing Agentic AI Crop Service...")
+            await agentic_ai_startup()
+            print("[OK] Agentic AI service initialized")
+        except Exception as e:
+            print(f"[WARN] Agentic AI service failed: {e}")
+
+    if get_fertilizer_service:
+        try:
+            print("[INIT] Initializing Fertilizer Prediction Service...")
+            fertilizer_service = get_fertilizer_service()
+            fertilizer_service.load_model()
+            print("[OK] Fertilizer service initialized")
+        except Exception as e:
+            print(f"[WARN] Fertilizer service failed: {e}")
     
-    print("[OK] Startup complete - API ready to accept requests")
+    print("\n[OK] Startup complete - API ready to accept requests\n")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -142,14 +252,34 @@ app.add_middleware(
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
-# Include routers
+# Include routers - only include if available
+print("[INFO] Registering API routes...")
 app.include_router(auth_router)
-app.include_router(fruit_disease_router)  # Legacy endpoint
-app.include_router(chatbot_router)  # AI Chatbot with voice assistance
-app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
-app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
-app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
-app.include_router(agentic_router)  # Agentic AI crop fetching
+print("[OK] Auth routes registered")
+
+if fruit_disease_router:
+    app.include_router(fruit_disease_router)  # Legacy endpoint
+    print("[OK] Fruit disease routes (legacy) registered")
+
+if chatbot_router:
+    app.include_router(chatbot_router)  # AI Chatbot with voice assistance
+    print("[OK] Chatbot routes registered")
+
+if fruit_disease_prod_router:
+    app.include_router(fruit_disease_prod_router)  # PRODUCTION endpoint (frozen model)
+    print("[OK] Fruit disease production routes registered")
+
+if fruit_disease_v2_router:
+    app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
+    print("[OK] Fruit disease V2 routes registered")
+
+if plant_disease_router:
+    app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
+    print("[OK] Plant disease routes registered")
+
+if agentic_router:
+    app.include_router(agentic_router)  # Agentic AI crop fetching
+    print("[OK] Agentic AI routes registered")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -236,6 +366,42 @@ async def get_db_stats():
     """Get FinalProject database statistics"""
     stats = await get_database_stats()
     return stats
+
+@app.get("/test-mongodb")
+def test_mongodb_connection():
+    """
+    Direct MongoDB Atlas connection test
+    Tests the synchronous PyMongo connection from db.py
+    """
+    try:
+        from db import client
+        client.admin.command('ping')
+        
+        # Also check if we can access collections
+        from db import users_collection, chat_sessions_collection
+        
+        return {
+            "status": "success",
+            "message": "MongoDB Atlas Connected",
+            "connection_type": "MongoDB Atlas (PyMongo)",
+            "database": "Connected",
+            "collections": {
+                "users": "accessible",
+                "chat_sessions": "accessible"
+            },
+            "details": "G£ô PyMongo synchronous connection working"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "suggestions": [
+                "1. Check MongoDB Atlas cluster is running",
+                "2. Verify MONGODB_URL in .env file",
+                "3. Check Network Access whitelist includes your IP",
+                "4. Verify username and password are correct"
+            ]
+        }
 
 # ====================
 # HTML Page Routes
@@ -841,7 +1007,7 @@ def get_fertilizer_location_data(data: dict):
                 
                 print(f"[OK] Soil data fetched: pH={result['soil_pH']}, Type={result['soil_type']}, Elevation={result['elevation']}m")
         except Exception as e:
-            print(f"âš ï¸ Failed to fetch soil data: {e}")
+            print(f"GÜán+Å Failed to fetch soil data: {e}")
             # Continue without soil data - user can enter manually
         
         # 1. Reverse Geocoding using Nominatim (OpenStreetMap)
@@ -974,7 +1140,7 @@ def get_fertilizer_location_data(data: dict):
                     rain_data = weather_data.get('rain', {})
                     result['rainfall'] = rain_data.get('1h', 0) or rain_data.get('3h', 0) or 0
                     
-                    print(f"[OK] Weather data fetched: Temp={result['temperature']}Â°C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
+                    print(f"[OK] Weather data fetched: Temp={result['temperature']}-¦C, Humidity={result['humidity']}%, Rainfall={result['rainfall']}mm")
                 else:
                     print(f"[ERROR] Weather API failed: Status {weather_response.status_code}")
                     print(f"Response: {weather_response.text[:200]}")
@@ -1039,7 +1205,7 @@ def api_predict_stress(data: dict):
             return ml_prediction
         
         # Step 2: Generate AI-powered explanation and recommendations
-        print("ğŸ§  Generating AI insights using Groq LLM...")
+        print("=ƒºá Generating AI insights using Groq LLM...")
         try:
             ai_insights = generate_stress_insights(data, ml_prediction)
             
@@ -1157,9 +1323,9 @@ def api_recommend_spray_time(data: SprayRequest):
     issues = []
     
     if temperature > 30:
-        issues.append("Temperature too high (>30Â°C)")
+        issues.append("Temperature too high (>30-¦C)")
     if temperature < 10:
-        issues.append("Temperature too low (<10Â°C)")
+        issues.append("Temperature too low (<10-¦C)")
     if humidity < 50:
         issues.append("Humidity too low (<50%)")
     if windSpeed > 15:
