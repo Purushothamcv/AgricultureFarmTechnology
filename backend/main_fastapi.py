@@ -8,6 +8,7 @@ import joblib
 import pandas as pd
 import sys
 import os
+import asyncio
 
 # Add backend directory to path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -134,23 +135,12 @@ app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Sup
 print("[INFO] FastAPI app instance created and ready to bind")
 print("[INFO] Backend is now listening for connections\n")
 
-# Event handlers for MongoDB connection
-@app.on_event("startup")
-async def startup_event():
-    """Initialize MongoDB connection and ML models on application startup"""
-    print("\n[START] Starting SmartAgri API initialization...\n")
-    
-    # MongoDB connection with error handling - don't block startup if it fails
-    try:
-        await connect_to_mongodb()
-        print("[OK] MongoDB Connected")
-    except Exception as e:
-        print(f"[WARN] MongoDB connection failed: {e}")
-        print("[WARN] Continuing startup - database operations will fail until connection restored")
+# Background initialization task (doesn't block port binding)
+async def initialize_services_background():
+    """Initialize all services in the background (non-blocking)"""
+    print("\n[BACKGROUND] Starting service initialization...")
     
     # Initialize each service with error handling
-    # If a service fails, log it but continue with others
-    
     if fruit_startup:
         try:
             await fruit_startup()
@@ -214,7 +204,26 @@ async def startup_event():
         except Exception as e:
             print(f"[WARN] Fertilizer service failed: {e}")
     
-    print("\n[OK] Startup complete - API ready to accept requests\n")
+    print("\n[BACKGROUND] Service initialization complete\n")
+
+# Event handlers for MongoDB connection
+@app.on_event("startup")
+async def startup_event():
+    """Quick startup - only connect MongoDB, defer service initialization"""
+    print("\n[START] Starting SmartAgri API (fast startup mode)...\n")
+    
+    # MongoDB connection with error handling - don't block startup if it fails
+    try:
+        await connect_to_mongodb()
+        print("[OK] MongoDB Connected")
+    except Exception as e:
+        print(f"[WARN] MongoDB connection failed: {e}")
+        print("[WARN] Continuing startup - database operations will fail until connection restored")
+    
+    # START service initialization in background (doesn't block port binding)
+    asyncio.create_task(initialize_services_background())
+    
+    print("\n[OK] Port ready - services loading in background...\n")
 
 @app.on_event("shutdown")
 async def shutdown_event():
