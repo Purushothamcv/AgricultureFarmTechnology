@@ -37,6 +37,13 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+# Debug: Log Google OAuth configuration status
+print(f"\n[AUTH] Google OAuth Configuration Status:")
+print(f"  GOOGLE_CLIENT_ID: {'✓ Loaded' if GOOGLE_CLIENT_ID else '✗ MISSING - OAuth will fail'}")
+print(f"  GOOGLE_CLIENT_SECRET: {'✓ Loaded' if GOOGLE_CLIENT_SECRET else '✗ MISSING - OAuth will fail'}")
+print(f"  BACKEND_URL: {BACKEND_URL}")
+print(f"  FRONTEND_URL: {FRONTEND_URL}\n")
+
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     """
@@ -426,10 +433,18 @@ def google_login_redirect():
     Step 1: Initiate Google OAuth flow
     Redirects user to Google's consent screen
     """
-    if not GOOGLE_CLIENT_ID:
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        error_msg = []
+        if not GOOGLE_CLIENT_ID:
+            error_msg.append("GOOGLE_CLIENT_ID not set")
+        if not GOOGLE_CLIENT_SECRET:
+            error_msg.append("GOOGLE_CLIENT_SECRET not set")
+        
+        detail = f"Google OAuth not configured: {', '.join(error_msg)}. Check environment variables."
+        print(f"[ERROR] {detail}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Google OAuth is not configured"
+            detail=detail
         )
     
     # Google OAuth2 endpoint

@@ -1,3 +1,21 @@
+# ============================================
+# CRITICAL: LOAD ENV VARIABLES FIRST
+# ============================================
+# This MUST be before any local imports that read env vars
+import os
+import sys
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env file into environment
+print(f"[DEBUG] Environment Variables Loaded")
+print(f"[DEBUG] GOOGLE_CLIENT_ID: {'✓' if os.getenv('GOOGLE_CLIENT_ID') else '✗ MISSING'}")
+print(f"[DEBUG] GOOGLE_CLIENT_SECRET: {'✓' if os.getenv('GOOGLE_CLIENT_SECRET') else '✗ MISSING'}")
+print(f"[DEBUG] MONGODB_URL: {'✓' if os.getenv('MONGODB_URL') else '✗ MISSING'}")
+
+# Add backend directory to path for absolute imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Now import FastAPI and other dependencies
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,12 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import pandas as pd
-import sys
-import os
 import asyncio
-
-# Add backend directory to path for absolute imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # ============================================
 # CRITICAL: LOG EARLY FOR RENDER DEBUGGING
@@ -1482,9 +1495,7 @@ def api_chatbot(data: dict):
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
+    # dotenv already loaded at top of file
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
     uvicorn.run(app, host=host, port=port)
