@@ -131,6 +131,15 @@ except ImportError as e:
 
 print("[INFO] All imports successful")
 
+# ============================================================================
+# LOW MEMORY MODE (512MB RAM on Render free tier)
+# ============================================================================
+LOW_MEMORY_MODE = os.getenv("LOW_MEMORY_MODE", "true").lower() == "true"
+if LOW_MEMORY_MODE:
+    print("[WARN] LOW_MEMORY_MODE enabled - heavy ML models will not load at startup")
+else:
+    print("[INFO] LOW_MEMORY_MODE disabled - all services will initialize")
+
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
 print("[INFO] FastAPI app instance created and ready to bind")
 print("[INFO] Backend is now listening for connections\n")
@@ -140,37 +149,50 @@ async def initialize_services_background():
     """Initialize all services in the background (non-blocking)"""
     print("\n[BACKGROUND] Starting service initialization...")
     
+    if LOW_MEMORY_MODE:
+        print("[WARN] LOW_MEMORY_MODE: Skipping heavy TensorFlow model loading")
+    
     # Initialize each service with error handling
-    if fruit_startup:
+    # Skip TensorFlow models in low memory mode
+    
+    if fruit_startup and not LOW_MEMORY_MODE:
         try:
             await fruit_startup()
             print("[OK] Fruit disease service (legacy) initialized")
         except Exception as e:
             print(f"[WARN] Fruit disease service (legacy) failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Fruit disease service (low memory mode)")
     
-    if fruit_prod_startup:
+    if fruit_prod_startup and not LOW_MEMORY_MODE:
         try:
             print("[INIT] Initializing Production Fruit Disease Detection...")
             await fruit_prod_startup()
             print("[OK] Production fruit disease service initialized")
         except Exception as e:
             print(f"[WARN] Production fruit disease service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Production fruit disease service (low memory mode)")
     
-    if fruit_v2_startup:
+    if fruit_v2_startup and not LOW_MEMORY_MODE:
         try:
             print("[INIT] Initializing Fruit Disease V2 (Clean Model)...")
             await fruit_v2_startup()
             print("[OK] Fruit Disease V2 service initialized")
         except Exception as e:
             print(f"[WARN] Fruit Disease V2 service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Fruit Disease V2 service (low memory mode)")
     
-    if plant_disease_startup:
+    if plant_disease_startup and not LOW_MEMORY_MODE:
         try:
             print("[INIT] Initializing Plant Leaf Disease Detection...")
             await plant_disease_startup()
             print("[OK] Plant disease service initialized")
         except Exception as e:
             print(f"[WARN] Plant disease service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Plant disease service (low memory mode)")
     
     if chatbot_startup:
         try:
@@ -178,14 +200,16 @@ async def initialize_services_background():
             await chatbot_startup()
             print("[OK] Chatbot service initialized")
         except Exception as e:
-            print(f"[WARN] Chatbot service failed: {e}")
+            print(f"[WARN] Chatbot service failed (check GROQ_API_KEY): {e}")
     
-    if yield_startup:
+    if yield_startup and not LOW_MEMORY_MODE:
         try:
             await yield_startup()
             print("[OK] Yield prediction service initialized")
         except Exception as e:
             print(f"[WARN] Yield service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Yield prediction service (low memory mode)")
 
     if agentic_ai_startup:
         try:
@@ -195,7 +219,7 @@ async def initialize_services_background():
         except Exception as e:
             print(f"[WARN] Agentic AI service failed: {e}")
 
-    if get_fertilizer_service:
+    if get_fertilizer_service and not LOW_MEMORY_MODE:
         try:
             print("[INIT] Initializing Fertilizer Prediction Service...")
             fertilizer_service = get_fertilizer_service()
@@ -203,6 +227,8 @@ async def initialize_services_background():
             print("[OK] Fertilizer service initialized")
         except Exception as e:
             print(f"[WARN] Fertilizer service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Fertilizer service (low memory mode)")
     
     print("\n[BACKGROUND] Service initialization complete\n")
 

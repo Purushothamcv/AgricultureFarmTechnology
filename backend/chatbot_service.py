@@ -195,12 +195,14 @@ class SessionListResponse(BaseModel):
 # ============================================================================
 
 def initialize_groq_client():
-    """Initialize Groq AI client"""
+    """Initialize Groq AI client - returns False if API key not available"""
     global groq_client
     
     if not GROQ_API_KEY:
-        logger.error("❌ GROQ_API_KEY not found in environment variables")
-        raise ValueError("GROQ_API_KEY not configured")
+        logger.warning("⚠️  GROQ_API_KEY not found - Chatbot service will be unavailable")
+        logger.warning("   Set GROQ_API_KEY environment variable to enable chatbot")
+        groq_client = None
+        return False
     
     try:
         groq_client = Groq(api_key=GROQ_API_KEY)
@@ -208,7 +210,8 @@ def initialize_groq_client():
         return True
     except Exception as e:
         logger.error(f"❌ Failed to initialize Groq client: {str(e)}")
-        raise
+        groq_client = None
+        return False
 
 # ============================================================================
 # CHATBOT LOGIC
@@ -715,10 +718,10 @@ async def legacy_translate_text(text: str, from_lang: str, to_lang: str):
 # ============================================================================
 
 async def startup_event():
-    """Initialize chatbot service on startup"""
+    """Initialize chatbot service on startup - continues even if Groq unavailable"""
     try:
         logger.info("🤖 Initializing AI Chatbot Service...")
-        initialize_groq_client()
+        groq_initialized = initialize_groq_client()
 
         # Ensure session indexes exist for fast and scalable history lookups.
         collection = get_chat_collection()
@@ -726,10 +729,13 @@ async def startup_event():
         await collection.create_index("user_id")
         await collection.create_index([("user_id", 1), ("updated_at", -1)])
 
-        logger.info("✅ AI Chatbot Service initialized successfully!")
+        if groq_initialized:
+            logger.info("✅ AI Chatbot Service initialized successfully!")
+        else:
+            logger.warning("⚠️  Chatbot service starting without Groq API (endpoints will return error)")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chatbot service: {str(e)}")
-        raise
+        logger.warning("⚠️  Chatbot service will be unavailable (non-fatal error)")
 
 # ============================================================================
 # HELPER FUNCTIONS FOR AGRICULTURAL CONTEXT
