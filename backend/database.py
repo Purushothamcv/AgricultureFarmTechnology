@@ -67,15 +67,16 @@ async def connect_to_mongodb():
                 logger.info(f"Retry attempt {attempt + 1}/{max_retries}...")
                 await asyncio.sleep(retry_delay)
             
-            # Connect to MongoDB
-            # ⚠️  NOTE: tlsAllowInvalidCertificates=True added temporarily for SSL handshake issues
-            #     This is for testing/development only. Remove before production deployment!
+            # Connect to MongoDB Atlas with proper timeout settings
             client = AsyncIOMotorClient(
                 MONGODB_URL, 
-                serverSelectionTimeoutMS=3000,  # Reduced from 5000 to 3000ms
-                connectTimeoutMS=3000,
-                socketTimeoutMS=3000,
-                tlsAllowInvalidCertificates=True  # Temporary: Allows SSL connections through corporate proxies
+                serverSelectionTimeoutMS=30000,  # 30 seconds for server discovery
+                connectTimeoutMS=30000,  # 30 seconds to establish connection
+                socketTimeoutMS=60000,  # 60 seconds for socket operations
+                retryWrites=True,  # Enable automatic write retries
+                retryReads=True,  # Enable automatic read retries
+                maxPoolSize=10,  # Connection pool size
+                minPoolSize=2   # Minimum connection pool size
             )
             
             # Initialize database instances

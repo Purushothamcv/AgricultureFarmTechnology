@@ -396,6 +396,47 @@ async def health_check():
         "api": "ok"
     }
 
+@app.get("/test-db")
+async def test_database_connection():
+    """
+    Test async MongoDB connection (used by FastAPI startup)
+    Diagnostic endpoint for troubleshooting connection issues
+    """
+    try:
+        from database import client as async_client
+        if async_client is None:
+            return {
+                "status": "error",
+                "connection_type": "Async (Motor)",
+                "message": "Async MongoDB client not initialized",
+                "advice": "Check if startup event completed successfully"
+            }
+        
+        # Test ping
+        await async_client.admin.command('ping')
+        
+        return {
+            "status": "success",
+            "connection_type": "Async MongoDB (Motor)",
+            "message": "MongoDB Atlas Connected via Motor (async)",
+            "database": "Connected",
+            "details": "Motor async connection working correctly"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "connection_type": "Async (Motor)",
+            "message": str(e),
+            "error_type": type(e).__name__,
+            "suggestions": [
+                "1. Check if MONGODB_URL environment variable is set",
+                "2. Verify MongoDB Atlas cluster is running and accessible",
+                "3. Check IP whitelist includes Render service IP",
+                "4. Verify credentials in connection string",
+                "5. Check network connectivity to mongodb.net"
+            ]
+        }
+
 @app.get("/api/database/stats")
 async def get_db_stats():
     """Get FinalProject database statistics"""
