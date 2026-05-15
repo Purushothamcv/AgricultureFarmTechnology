@@ -18,9 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first (for better caching)
 COPY requirements.txt .
 
-# Install Python dependencies with cache optimization
-# Use pip cache to speed up builds
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with optimization for Render
+# - Upgrade pip for better resolution algorithm
+# - Use --no-cache-dir to save disk space
+# - Pin all versions to prevent resolver backtracking (especially for SQLAlchemy)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
