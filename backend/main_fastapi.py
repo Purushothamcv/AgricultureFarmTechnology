@@ -1,8 +1,14 @@
 # ============================================
-# CRITICAL: LOAD ENV VARIABLES FIRST
+# CRITICAL: SUPPRESS TENSORFLOW EARLY
 # ============================================
-# This MUST be before any local imports that read env vars
+# Must be before ANY imports (especially TensorFlow)
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow startup logs
+os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+
+# Configure production logging
+import logging_config
+
 import sys
 from dotenv import load_dotenv
 
@@ -15,16 +21,30 @@ print(f"[DEBUG] MONGODB_URL: {'✓' if os.getenv('MONGODB_URL') else '✗ MISSIN
 # Add backend directory to path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Now import FastAPI and other dependencies
+# ============================================
+# LAZY LOAD: Import model_manager for on-demand loading
+# ============================================
+from model_manager import (
+    get_yield_model, get_best_window_model, get_stress_model, 
+    get_crop_model, get_fert_model,
+    cleanup_after_inference, cleanup_all_models,
+    get_model_stats, suppress_tensorflow_logging
+)
+
+# Suppress TensorFlow logging before any TF imports
+suppress_tensorflow_logging()
+
+# Now import FastAPI and other dependencies (NO TensorFlow yet!)
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import joblib
 import pandas as pd
 import asyncio
+import gc
+import traceback
 
 # ============================================
 # CRITICAL: LOG EARLY FOR RENDER DEBUGGING
@@ -77,6 +97,14 @@ except ImportError as e:
     fruit_v2_startup = None
 
 try:
+    from fruit_disease_detection import router as fruit_disease_detection_router, startup_event as fruit_detection_startup
+    print("[OK] Fruit disease detection service (with selection) imported")
+except ImportError as e:
+    print(f"[SKIP] Fruit disease detection service not available: {e}")
+    fruit_disease_detection_router = None
+    fruit_detection_startup = None
+
+try:
     from plant_disease_service import router as plant_disease_router, startup_event as plant_disease_startup
     print("[OK] Plant disease service imported")
 except ImportError as e:
@@ -91,6 +119,14 @@ except ImportError as e:
     print(f"[SKIP] Chatbot service not available: {e}")
     chatbot_router = None
     chatbot_startup = None
+
+try:
+    from remedy_generation_service import router as remedy_router, startup_event as remedy_startup
+    print("[OK] Remedy generation service imported")
+except ImportError as e:
+    print(f"[SKIP] Remedy generation service not available: {e}")
+    remedy_router = None
+    remedy_startup = None
 
 try:
     from yield_prediction_service import get_yield_service, startup_event as yield_startup
@@ -157,6 +193,18 @@ app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Sup
 print("[INFO] FastAPI app instance created and ready to bind")
 print("[INFO] Backend is now listening for connections\n")
 
+
+@app.middleware("http")
+async def catch_unhandled_exceptions(request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(exc), "path": str(request.url.path)}
+        )
+
 # Background initialization task (doesn't block port binding)
 async def initialize_services_background():
     """Initialize all services in the background (non-blocking)"""
@@ -197,6 +245,16 @@ async def initialize_services_background():
     elif LOW_MEMORY_MODE:
         print("[SKIP] Fruit Disease V2 service (low memory mode)")
     
+    if fruit_detection_startup and not LOW_MEMORY_MODE:
+        try:
+            print("[INIT] Initializing Fruit Disease Detection (with Selection)...")
+            await fruit_detection_startup()
+            print("[OK] Fruit disease detection service initialized")
+        except Exception as e:
+            print(f"[WARN] Fruit disease detection service failed: {e}")
+    elif LOW_MEMORY_MODE:
+        print("[SKIP] Fruit disease detection service (low memory mode)")
+    
     if plant_disease_startup and not LOW_MEMORY_MODE:
         try:
             print("[INIT] Initializing Plant Leaf Disease Detection...")
@@ -214,6 +272,14 @@ async def initialize_services_background():
             print("[OK] Chatbot service initialized")
         except Exception as e:
             print(f"[WARN] Chatbot service failed (check GROQ_API_KEY): {e}")
+    
+    if remedy_startup:
+        try:
+            print("[INIT] Initializing Disease Remedy Generation Service...")
+            await remedy_startup()
+            print("[OK] Remedy generation service initialized")
+        except Exception as e:
+            print(f"[WARN] Remedy generation service failed: {e}")
     
     if yield_startup and not LOW_MEMORY_MODE:
         try:
@@ -266,8 +332,9 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close MongoDB connection on application shutdown"""
+    """Clean up resources on application shutdown"""
     print("[SHUTDOWN] Shutting down SmartAgri API...")
+    cleanup_all_models()
     await close_mongodb_connection()
 
 # Configure CORS
@@ -281,16 +348,17 @@ allowed_origins = [
     "http://127.0.0.1:3002",
     "http://127.0.0.1:5173",  # Vite dev server (127.0.0.1)
     "https://agriculture-farm-technology.vercel.app",
-    "https://*.vercel.app",
     "https://smartagri-backend-ckcz.onrender.com",  # Allow backend to call itself
-    "https://*.onrender.com",  # Allow any Render frontend deployment
 ]
+allowed_origin_regex = r"^https://.*\.(vercel\.app|onrender\.com)$"
 
 print(f"[CORS] CORS enabled for origins: {allowed_origins}")
+print(f"[CORS] CORS enabled for regex origins: {allowed_origin_regex}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -321,9 +389,17 @@ if fruit_disease_v2_router:
     app.include_router(fruit_disease_v2_router)  # V2 endpoint (NEW clean trained model - 92%+)
     print("[OK] Fruit disease V2 routes registered")
 
+if fruit_disease_detection_router:
+    app.include_router(fruit_disease_detection_router)  # Fruit disease detection with fruit selection
+    print("[OK] Fruit disease detection routes registered")
+
 if plant_disease_router:
     app.include_router(plant_disease_router)  # Plant Leaf Disease Detection
     print("[OK] Plant disease routes registered")
+
+if remedy_router:
+    app.include_router(remedy_router)  # Disease Remedy Generation Service
+    print("[OK] Remedy generation routes registered")
 
 if agentic_router:
     app.include_router(agentic_router)  # Agentic AI crop fetching
@@ -366,12 +442,10 @@ class FertilizerAutoFillRequest(BaseModel):
     latitude: float
     longitude: float
 
-# Load ML models
-yield_model = joblib.load("model/yield_model.pkl")
-time_model = joblib.load("model/best_window_model.pkl")
-fert_model = joblib.load("model/fert_model.pkl")
-stress_model = joblib.load("model/stress_model.pkl")
-crop_model = joblib.load("model/crop_model.pkl")
+# ============================================
+# LAZY LOADING: Models are now loaded on-demand via model_manager
+# NO global model loading to save startup memory
+# ============================================
 
 # ====================
 # Main Application Routes
@@ -404,9 +478,9 @@ async def health_check():
     except Exception:
         db_status = "disconnected"
     return {
-        "status": "healthy" if db_status == "connected" else "degraded",
+        "status": "running",
         "database": db_status,
-        "api": "ok"
+        "backend": "healthy" if db_status == "connected" else "degraded"
     }
 
 @app.get("/test-db")
@@ -455,6 +529,11 @@ async def get_db_stats():
     """Get FinalProject database statistics"""
     stats = await get_database_stats()
     return stats
+
+@app.get("/api/models/stats")
+async def get_models_stats():
+    """Get ML models cache statistics and status"""
+    return get_model_stats()
 
 @app.get("/test-mongodb")
 def test_mongodb_connection():
@@ -657,8 +736,16 @@ def predict_yield(lat: float, lon: float, ozone: float, soil: float):
     temp = weather['temp']
     rain = weather['rain']
     features = pd.DataFrame([[ozone, temp, rain, soil]], columns=["ozone", "temp", "rain", "soil"])
-    prediction = yield_model.predict(features)[0]
-    return {"result": f"Predicted Potato Yield: {prediction:.2f} tonnes/hectare"}
+    
+    try:
+        yield_model = get_yield_model()
+        if yield_model is None:
+            return JSONResponse({'error': 'Yield model not available'}, status_code=503)
+        prediction = yield_model.predict(features)[0]
+        cleanup_after_inference()
+        return {"result": f"Predicted Potato Yield: {prediction:.2f} tonnes/hectare"}
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 @app.get("/recommend_fertilizer")
 def recommend_fertilizer_api(lat: float, lon: float, ozone: float, soil: float, ph: float, stage: str):
@@ -675,22 +762,42 @@ def recommend_fertilizer_api(lat: float, lon: float, ozone: float, soil: float, 
         "ph": ph,
         "stage": stage
     }])
-    result = recommend_fertilizer(input_df, fert_model)
-    return {"result": f"Recommended Fertilizer: {result}"}
+    
+    try:
+        fert_model = get_fert_model()
+        if fert_model is None:
+            return JSONResponse({'error': 'Fertilizer model not available'}, status_code=503)
+        result = recommend_fertilizer(input_df, fert_model)
+        cleanup_after_inference()
+        return {"result": f"Recommended Fertilizer: {result}"}
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 @app.get("/predict_stress")
 def predict_stress(lat: float, lon: float, ozone: float, temp: float, humidity: float, color: str, symptom: str):
     input_df = pd.DataFrame([[ozone, temp, humidity, color, symptom]],
                             columns=["ozone", "temp", "humidity", "color", "symptom"])
-    level, explanation = predict_stress_level(stress_model, input_df)
-    return {"result": f"Stress Level: {level}", "explanation": explanation}
+    
+    try:
+        stress_model = get_stress_model()
+        if stress_model is None:
+            return JSONResponse({'error': 'Stress model not available'}, status_code=503)
+        level, explanation = predict_stress_level(stress_model, input_df)
+        cleanup_after_inference()
+        return {"result": f"Stress Level: {level}", "explanation": explanation}
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 @app.get("/recommend_crop")
 def recommend_crop(N: float, P: float, K: float, temperature: float, humidity: float, ph: float, rainfall: float, ozone: float):
     features = [[N, P, K, temperature, humidity, ph, rainfall, ozone]]
     try:
+        crop_model = get_crop_model()
+        if crop_model is None:
+            return JSONResponse({'error': 'Crop model not available'}, status_code=503)
         pred = crop_model.predict(features)[0]
         known_crops = set(str(c) for c in crop_model.classes_)
+        cleanup_after_inference()
         if str(pred).strip().lower() in (c.strip().lower() for c in known_crops):
             return {"recommended_crop": pred}
         else:
@@ -718,7 +825,11 @@ def api_recommend_crop(data: dict):
     
     features = [[N, P, K, temperature, humidity, ph, rainfall, ozone]]
     try:
+        crop_model = get_crop_model()
+        if crop_model is None:
+            raise HTTPException(status_code=503, detail="Crop model not available")
         pred = crop_model.predict(features)[0]
+        cleanup_after_inference()
         return {"crop": pred}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Prediction error: {str(e)}")
@@ -755,10 +866,17 @@ def api_predict_yield(data: dict):
         columns=["ozone", "temp", "rain", "soil"]
     )
     
-    # Predict yield
+    # Predict yield with lazy loading
     try:
-        prediction = yield_model.predict(features)[0]
-        yield_value = round(max(float(prediction), 0.0), 2)
+        yield_model = get_yield_model()
+        if yield_model is None:
+            # Fallback calculation if model not available
+            fallback_prediction = float(area) * (30 + (temp * 0.5) + (rain * 0.3))
+            yield_value = round(max(fallback_prediction, 0.0), 2)
+        else:
+            prediction = yield_model.predict(features)[0]
+            yield_value = round(max(float(prediction), 0.0), 2)
+            cleanup_after_inference()
     except Exception as e:
         # Fallback calculation if model fails
         fallback_prediction = float(area) * (30 + (temp * 0.5) + (rain * 0.3))
@@ -848,7 +966,15 @@ async def get_yield_states():
             "states": options.get('State', [])
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load states: {str(e)}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "message": "Yield states unavailable",
+                "detail": str(e)
+            }
+        )
 
 
 @app.get("/yield/districts/{state}")
@@ -1013,13 +1139,23 @@ def get_fertilizer_options():
     """Get all valid options for categorical features"""
     try:
         fertilizer_service = get_fertilizer_service()
+        if not fertilizer_service.encoders:
+            if not fertilizer_service.load_model():
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "error", "message": "Fertilizer model unavailable"}
+                )
         options = fertilizer_service.get_feature_options()
         return {
             "success": True,
             "options": options
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get options: {str(e)}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Fertilizer model unavailable"}
+        )
 
 
 @app.get("/api/fertilizer/model-info")
@@ -1027,13 +1163,23 @@ def get_fertilizer_model_info():
     """Get fertilizer model information and metrics"""
     try:
         fertilizer_service = get_fertilizer_service()
+        if not fertilizer_service.model:
+            if not fertilizer_service.load_model():
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "error", "message": "Fertilizer model unavailable"}
+                )
         info = fertilizer_service.get_model_info()
         return {
             "success": True,
             **info
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Fertilizer model unavailable"}
+        )
 
 
 @app.post("/api/fertilizer/location-data")

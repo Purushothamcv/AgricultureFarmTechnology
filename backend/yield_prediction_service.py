@@ -155,8 +155,14 @@ class YieldPredictionService:
                 print(f"     - MAE: {self.metrics.get('mae', 0):.4f}")
 
             # Load APY data at startup to avoid first-request latency.
-            self._load_apy_dataset()
-            print("  ✅ APY dataset loaded for state/crop filters")
+            try:
+                self._load_apy_dataset()
+                print("  ✅ APY dataset loaded for state/crop filters")
+            except FileNotFoundError:
+                print("  ⚠️ APY.csv not found; using encoder-based fallback for dropdown values")
+            except Exception as dataset_error:
+                print(f"  ⚠️ APY dataset could not be loaded: {dataset_error}")
+                print("  ⚠️ Continuing with encoder-based fallback for dropdown values")
             
             self.is_loaded = True
             print(f"✅ Yield Prediction Service ready!")

@@ -120,7 +120,8 @@ class FertilizerPredictionService:
                 - all_probabilities: dict (all class probabilities)
         """
         if not self.model:
-            raise RuntimeError("Model not loaded. Call load_model() first.")
+            if not self.load_model():
+                raise RuntimeError("Model not loaded. Call load_model() first.")
         
         # Validate inputs
         is_valid, error_msg = self._validate_inputs(inputs)
@@ -171,7 +172,8 @@ class FertilizerPredictionService:
     def get_feature_options(self) -> Dict[str, Any]:
         """Get all valid options for categorical features"""
         if not self.encoders:
-            raise RuntimeError("Encoders not loaded. Call load_model() first.")
+            if not self.load_model():
+                raise RuntimeError("Encoders not loaded. Call load_model() first.")
         
         options = {}
         for feature, encoder in self.encoders.items():
@@ -182,10 +184,11 @@ class FertilizerPredictionService:
     def get_model_info(self) -> Dict[str, Any]:
         """Get model information and metrics"""
         if not self.model:
-            raise RuntimeError("Model not loaded")
+            if not self.load_model():
+                raise RuntimeError("Model not loaded")
         
         try:
-            model_dir = Path("model")
+            model_dir = Path(__file__).parent / "model"
             metrics_path = model_dir / "fertilizer_model_metrics.json"
             
             import json

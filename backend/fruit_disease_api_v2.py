@@ -45,26 +45,30 @@ router = APIRouter(
 detector: Optional[FruitDiseaseDetector] = None
 
 
-async def startup_event():
-    """Initialize detector at application startup"""
+def _lazy_load_detector() -> Optional[FruitDiseaseDetector]:
+    """Load the detector only when a request needs it."""
     global detector
+    if detector is not None:
+        return detector
     try:
-        logger.info("🚀 Initializing Fruit Disease Detector...")
+        logger.info("Loading fruit disease model...")
         detector = FruitDiseaseDetector()
-        logger.info("✅ Detector initialized successfully")
+        logger.info("Fruit disease model loaded successfully")
+        return detector
     except Exception as e:
         logger.error(f"❌ Failed to initialize detector: {e}")
-        raise
+        detector = None
+        return None
 
 
-def get_detector() -> FruitDiseaseDetector:
+async def startup_event():
+    """Initialize detector at application startup"""
+    _lazy_load_detector()
+
+
+def get_detector() -> Optional[FruitDiseaseDetector]:
     """Get detector instance"""
-    if detector is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Fruit disease detection service not initialized"
-        )
-    return detector
+    return _lazy_load_detector()
 
 
 @router.get("/health")
@@ -77,6 +81,14 @@ async def health_check():
     """
     try:
         det = get_detector()
+        if det is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         return {
             "status": "healthy",
             "service": "Fruit Disease Detection V2",
@@ -108,6 +120,14 @@ async def get_classes():
     """
     try:
         det = get_detector()
+        if det is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Organize classes by fruit
         classes_by_fruit = {}
@@ -218,6 +238,14 @@ async def predict_disease(
         
         # Get detector
         det = get_detector()
+        if det is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Make prediction with new parameters
         result = det.predict_with_details(
@@ -323,6 +351,14 @@ async def predict_disease_batch(
         
         # Get detector
         det = get_detector()
+        if det is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Make batch prediction
         results = det.predict_batch(images, top_n=top_n)

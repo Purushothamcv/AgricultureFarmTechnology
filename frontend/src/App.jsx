@@ -14,6 +14,7 @@ import FertilizerRecommendation from './pages/FertilizerRecommendation';
 import StressPrediction from './pages/StressPrediction';
 import BestSprayTime from './pages/BestSprayTime';
 import FruitDisease from './pages/FruitDisease';
+import FruitDetectionDetailed from './pages/FruitDetectionDetailed';
 import LeafDisease from './pages/LeafDisease';
 import Chatbot from './pages/Chatbot';
 
@@ -81,6 +82,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <FruitDisease />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/fruit-disease-detection" 
+            element={
+              <ProtectedRoute>
+                <FruitDetectionDetailed />
               </ProtectedRoute>
             } 
           />

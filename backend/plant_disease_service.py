@@ -317,6 +317,8 @@ def predict_disease(
     return {
         "crop": clean_plant,
         "disease": clean_disease,
+        "raw_crop": raw_plant,  # Raw crop name from model (preserve original case)
+        "raw_disease": raw_disease,  # Raw disease name from model (preserve original case)
         "confidence": primary_confidence,
         "severity": severity,
         "warning": warning,
@@ -400,7 +402,27 @@ async def predict_plant_disease(file: UploadFile = File(...)):
         # Log prediction with cleaned names
         logger.info(f"✅ Prediction: {result['crop']} - {result['disease']} ({result['confidence']:.2%})")
         
-        return JSONResponse(content=result)
+        # Build response in the format expected by frontend
+        # The frontend expects "prediction" field in "Disease_Crop" format with raw names
+        raw_disease = result.get('raw_disease', result['disease'].replace(' ', '_'))
+        raw_crop = result.get('raw_crop', result['crop'].replace(' ', '_'))
+        
+        # Create prediction label in "Disease_Crop" format (single underscore)
+        # Using raw names to preserve original case and match REMEDIES dictionary keys
+        prediction_label = f"{raw_disease}_{raw_crop}"
+        
+        # Prepare response with all necessary fields
+        response_data = {
+            "prediction": prediction_label,  # Format: "Disease_Crop" (e.g., "Early_blight_Tomato")
+            "confidence": result['confidence'],
+            "crop": result['crop'],  # Cleaned crop name for display
+            "disease": result['disease'],  # Cleaned disease name for display
+            "severity": result['severity'],
+            "warning": result['warning'],
+            "top_3": result['top_3']
+        }
+        
+        return JSONResponse(content=response_data)
         
     except Exception as e:
         logger.error(f"❌ Prediction error: {str(e)}")

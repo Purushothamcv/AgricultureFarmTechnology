@@ -43,15 +43,13 @@ def get_predictor():
     global predictor
     if predictor is None:
         try:
-            logger.info("Initializing Fruit Disease Predictor...")
+            logger.info("Loading fruit disease model...")
             predictor = FruitDiseasePredictor()
+            logger.info("Fruit disease model loaded successfully")
             logger.info("✓ Predictor initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize predictor: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Model initialization failed: {str(e)}"
-            )
+            return None
     return predictor
 
 
@@ -65,6 +63,14 @@ async def health_check():
     """
     try:
         pred = get_predictor()
+        if pred is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         return {
             "status": "healthy",
             "service": "Fruit Disease Detection",
@@ -88,6 +94,14 @@ async def get_classes():
     """
     try:
         pred = get_predictor()
+        if pred is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Organize classes by fruit
         classes_by_fruit = {}
@@ -145,6 +159,14 @@ async def predict_disease(
         
         # Get predictor
         pred = get_predictor()
+        if pred is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Make prediction
         result = pred.predict_with_recommendations(image, top_n=top_n)
@@ -201,6 +223,14 @@ async def predict_batch(
         
         # Get predictor
         pred = get_predictor()
+        if pred is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         # Process each image
         results = []
@@ -258,6 +288,14 @@ async def get_model_info():
     """
     try:
         pred = get_predictor()
+        if pred is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unavailable",
+                    "message": "Fruit disease model temporarily unavailable on cloud deployment"
+                }
+            )
         
         return {
             "model_name": "Fruit Disease Detector",

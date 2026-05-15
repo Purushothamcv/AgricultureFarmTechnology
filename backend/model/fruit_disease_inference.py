@@ -21,11 +21,6 @@ Date: 2026-01-21
 import os
 import json
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, models
-from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras.applications.efficientnet import preprocess_input
 from PIL import Image
 import logging
 
@@ -72,6 +67,7 @@ class FruitDiseasePredictor:
     def _load_model(self):
         """Load trained Keras model with multiple fallback strategies"""
         try:
+            import tensorflow as tf
             if not os.path.exists(self.model_path):
                 raise FileNotFoundError(f"Model not found at: {self.model_path}")
             
@@ -108,6 +104,10 @@ class FruitDiseasePredictor:
                         # Strategy 4: Manual architecture reconstruction with weight loading
                         logger.info("Attempting Strategy 4: Manual reconstruction...")
                         try:
+                            layers = tf.keras.layers
+                            models = tf.keras.models
+                            EfficientNetB0 = tf.keras.applications.EfficientNetB0
+
                             # Build the exact architecture from training
                             base_model = EfficientNetB0(
                                 include_top=False,
@@ -173,6 +173,8 @@ class FruitDiseasePredictor:
             Preprocessed image array
         """
         try:
+            import tensorflow as tf
+            preprocess_input = tf.keras.applications.efficientnet.preprocess_input
             # Load image
             if isinstance(image_path, str):
                 img = Image.open(image_path)

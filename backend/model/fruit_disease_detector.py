@@ -29,9 +29,6 @@ Date: 2026-01-25 (Updated)
 import os
 import json
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.efficientnet import preprocess_input
 from PIL import Image
 from typing import Dict, List, Tuple, Optional
 import logging
@@ -150,6 +147,8 @@ class FruitDiseaseDetector:
     def _load_model(self):
         """Load trained Keras model"""
         try:
+            import tensorflow as tf
+            load_model = tf.keras.models.load_model
             if not os.path.exists(self.model_path):
                 raise FileNotFoundError(f"Model file not found: {self.model_path}")
             
@@ -179,6 +178,8 @@ class FruitDiseaseDetector:
             Preprocessed numpy array ready for prediction
         """
         try:
+            import tensorflow as tf
+            preprocess_input = tf.keras.applications.efficientnet.preprocess_input
             if debug:
                 logger.info(f"Input image mode: {image.mode}, size: {image.size}")
             

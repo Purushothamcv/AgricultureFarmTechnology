@@ -181,6 +181,11 @@ export const diseaseService = {
       }
     });
     return response.data;
+  },
+
+  async generateRemedy(diseaseInfo) {
+    const response = await api.post('/api/generate-disease-remedy', diseaseInfo);
+    return response.data;
   }
 };
 
@@ -188,5 +193,55 @@ export const chatbotService = {
   async sendMessage(payload) {
     const response = await api.post('/chat/send', payload);
     return response.data;
+  }
+};
+
+export const fruitDetectionService = {
+  async getSupportedFruits() {
+    try {
+      console.log('🍎 Fetching supported fruits...');
+      const response = await api.get('/api/fruit-disease-detection/supported-fruits');
+      console.log('✅ Supported fruits loaded:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Failed to fetch supported fruits:', error);
+      throw error;
+    }
+  },
+
+  async predictWithSelection(formData) {
+    try {
+      console.log('🔍 Sending fruit disease detection request...');
+      const response = await api.post('/api/fruit-disease-detection/predict-with-selection', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      console.log('✅ Prediction response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fruit disease prediction failed:', error);
+      
+      // Handle error response
+      if (error.response?.data) {
+        return {
+          success: false,
+          error: error.response.data.error || 'Failed to predict disease',
+          data: error.response.data.data || null
+        };
+      }
+      
+      throw error;
+    }
+  },
+
+  async checkHealth() {
+    try {
+      const response = await api.get('/api/fruit-disease-detection/health');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      throw error;
+    }
   }
 };
