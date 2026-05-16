@@ -2,7 +2,7 @@
 # RENDER DEPLOYMENT - OPTIMIZED FOR 512MB RAM
 # ============================================
 # Pinned versions to prevent pip backtracking
-# and avoid SQLAlchemy dependency resolution issues
+# Minimal dependencies for fast deployment
 
 # Core Web Framework
 fastapi==0.115.0
@@ -11,7 +11,7 @@ python-dotenv==1.0.0
 pydantic[email]==2.7.1
 python-multipart==0.0.6
 
-# MongoDB (NO SQL database needed)
+# MongoDB (async driver for non-blocking I/O)
 pymongo==4.8.0
 motor==3.5.1
 
@@ -20,41 +20,54 @@ bcrypt==4.1.2
 python-jose[cryptography]==3.3.0
 google-auth==2.31.0
 google-auth-oauthlib==1.2.1
-cryptography==43.0.0
+cryptography==42.0.7
 
 # Data Processing
 pandas==2.2.2
 numpy==1.26.4
 requests==2.32.3
+httpx==0.28.1
 
-# ML/Prediction Models
+# ML Models (lazy loaded, NOT at startup)
 scikit-learn==1.7.2
 joblib==1.4.2
 xgboost==2.1.1
-
-# Image Processing
 pillow==10.4.0
 
-# TensorFlow (MINIMAL - lazy loaded, NOT at startup)
-# Note: Keras 3.x comes bundled with TensorFlow 2.16+
-tensorflow==2.16.1
+# Email validation
+email-validator==2.3.0
 
-# AI Features (Groq + LangChain, optional)
-# Note: Versions pinned for compatibility
+# AI Features - Groq Integration (requires GROQ_API_KEY)
 groq==0.9.0
+pydantic-settings==2.2.1
+
+# LangChain ecosystem (optional, for AI enhancements)
 langchain==0.1.20
+langchain-core==0.1.53
+langchain-community==0.0.38
 langchain-groq==0.0.1
 
-# Explicitly pin SQLAlchemy to prevent resolver backtracking
-# (pulled in by langchain ecosystem, not used directly)
-sqlalchemy==2.0.35
+# ============================================
+# OPTIONAL: Uncomment for development/testing
+# ============================================
+# TensorFlow (OPTIONAL - causes memory spikes on Render free tier)
+# Uncomment only if needed for disease detection services
+# tensorflow==2.16.1
 
 # ============================================
-# REMOVED (MongoDB project uses no SQL):
+# DEPLOYMENT NOTES
 # ============================================
-# - sqlmodel, alembic, psycopg2, databases
+# - TensorFlow (2.16.1+) is ~500MB and causes Render free tier crashes
+# - ML models load lazily on first API request, not at startup
+# - All imports use try/except to prevent cascade failures
+# - Render builds with: pip install --no-cache-dir -r requirements.txt
+# - Set environment variables in Render dashboard:
+#   * GROQ_API_KEY: Your API key for chatbot
+#   * LOW_MEMORY_MODE: true (keeps services lightweight)
+#   * TF_CPP_MIN_LOG_LEVEL: 3 (suppress TF startup logs)
 #
-# REMOVED (not needed for runtime):
-# - streamlit, matplotlib, seaborn (training only)
-# - folium, streamlit-folium (Streamlit UI only)
-# - plotly, dash (visualization only)
+# REMOVED:
+# - sqlalchemy, sqlmodel, alembic (no SQL database)
+# - psycopg2, databases (no PostgreSQL)
+# - streamlit, matplotlib, seaborn (dev only)
+# - plotly, dash, folium (visualization only)

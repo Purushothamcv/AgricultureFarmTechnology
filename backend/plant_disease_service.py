@@ -41,7 +41,7 @@ TOP_K_PREDICTIONS = 3
 # GLOBAL MODEL AND CLASS MAPPING
 # ============================================================================
 
-plant_disease_model: Optional[keras.Model] = None
+plant_disease_model = None  # Loaded lazily on first use
 class_names: List[str] = []
 class_mapping: Dict[int, str] = {}
 
@@ -236,7 +236,7 @@ def clean_disease_name(raw_disease: str) -> str:
 # ============================================================================
 
 def predict_disease(
-    model: keras.Model,
+    model: object,  # Keras Model (type import deferred to avoid circular dependencies)
     image_array: np.ndarray,
     class_mapping: Dict[int, str],
     top_k: int = TOP_K_PREDICTIONS
