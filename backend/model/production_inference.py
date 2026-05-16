@@ -48,20 +48,20 @@ PRODUCTION DEPLOYMENT STRATEGY
 
 Author: SmartAgri-AI Team
 Date: January 22, 2026
-Status: PRODUCTION READY ✅
+Status: PRODUCTION READY
 """
 
 import os
 import json
 import time
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.applications.efficientnet import preprocess_input
 from PIL import Image
 import logging
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
+
+# LAZY LOAD: TensorFlow only when needed (not at module level)
+# from tensorflow import keras moved to __init__ and functions
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -115,7 +115,7 @@ class FruitDiseaseInferenceEngine:
         self._load_class_labels()
         self._load_frozen_model()
         
-        logger.info("✅ FruitDiseaseInferenceEngine initialized successfully")
+        logger.info("[OK] FruitDiseaseInferenceEngine initialized successfully")
     
     def _load_class_labels(self):
         """Load class index to name mapping"""
@@ -129,7 +129,7 @@ class FruitDiseaseInferenceEngine:
             # Convert string keys to integers
             self.labels = {int(k): v for k, v in labels_data.items()}
             
-            logger.info(f"✓ Loaded {len(self.labels)} class labels")
+            logger.info(f"[OK] Loaded {len(self.labels)} class labels")
             
         except Exception as e:
             logger.error(f"Failed to load class labels: {e}")
@@ -141,11 +141,14 @@ class FruitDiseaseInferenceEngine:
         
         Critical: Model is frozen and cannot be trained further
         """
+        # LAZY LOAD: Import TensorFlow only when needed
+        from tensorflow import keras
+        
         try:
             if not self.model_path.exists():
                 error_msg = (
                     f"\n{'='*70}\n"
-                    f"❌ MODEL FILE NOT FOUND\n"
+                    f"MODEL FILE NOT FOUND\n"
                     f"{'='*70}\n"
                     f"Path: {self.model_path}\n\n"
                     f"TO FIX THIS:\n"
@@ -166,7 +169,7 @@ class FruitDiseaseInferenceEngine:
             if file_size_mb < 1.0:
                 error_msg = (
                     f"\n{'='*70}\n"
-                    f"❌ MODEL FILE CORRUPTED (Size: {file_size_mb:.2f} MB)\n"
+                    f"MODEL FILE CORRUPTED (Size: {file_size_mb:.2f} MB)\n"
                     f"{'='*70}\n"
                     f"Expected size: ~20-25 MB\n"
                     f"Actual size: {file_size_mb:.2f} MB\n\n"
@@ -207,7 +210,7 @@ class FruitDiseaseInferenceEngine:
             if actual_output_shape != expected_output_shape:
                 logger.warning(f"Output shape mismatch: expected {expected_output_shape}, got {actual_output_shape}")
             
-            logger.info("✓ Model loaded successfully in FROZEN mode")
+            logger.info("[OK] Model loaded successfully in FROZEN mode")
             logger.info(f"  - Total parameters: {self.model.count_params():,}")
             logger.info(f"  - Input shape: {actual_input_shape}")
             logger.info(f"  - Output shape: {actual_output_shape}")
@@ -247,6 +250,9 @@ class FruitDiseaseInferenceEngine:
         Returns:
             Preprocessed numpy array
         """
+        # LAZY LOAD: Import preprocess_input only when needed
+        from tensorflow.keras.applications.efficientnet import preprocess_input
+        
         try:
             # Resize to model input size
             image = image.resize((self.img_width, self.img_height))
@@ -481,7 +487,7 @@ def get_inference_engine() -> FruitDiseaseInferenceEngine:
     if _inference_engine is None:
         logger.info("Initializing global inference engine...")
         _inference_engine = FruitDiseaseInferenceEngine()
-        logger.info("✅ Global inference engine ready")
+        logger.info("[OK] Global inference engine ready")
     
     return _inference_engine
 

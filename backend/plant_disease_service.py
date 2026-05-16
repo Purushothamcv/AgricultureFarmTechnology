@@ -16,11 +16,13 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from PIL import Image
-import tensorflow as tf
-from tensorflow import keras
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import logging
+
+# LAZY LOAD: TensorFlow only when needed
+# Import happens inside load_plant_disease_model() function
+# This prevents hanging during module import on Render
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +80,7 @@ def extract_class_names_from_dataset(dataset_path: str) -> List[str]:
     # Sort alphabetically to match model training order
     class_folders.sort()
     
-    logger.info(f"📁 Extracted {len(class_folders)} disease classes from dataset")
+    logger.info(f"Extracted {len(class_folders)} disease classes from dataset")
     logger.info(f"   Classes: {', '.join(class_folders[:5])}{'...' if len(class_folders) > 5 else ''}")
     
     return class_folders
@@ -101,7 +103,7 @@ def create_class_mapping(class_names: List[str]) -> Dict[int, str]:
 # MODEL LOADING
 # ============================================================================
 
-def load_plant_disease_model(model_path: str) -> keras.Model:
+def load_plant_disease_model(model_path: str):
     """
     Load trained plant disease detection model.
     
@@ -115,18 +117,21 @@ def load_plant_disease_model(model_path: str) -> keras.Model:
         FileNotFoundError: If model file doesn't exist
         Exception: If model loading fails
     """
+    # LAZY LOAD: Import TensorFlow only when needed (not at module level)
+    from tensorflow import keras
+    
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
     
     try:
-        logger.info(f"🔄 Loading plant disease model from: {model_path}")
+        logger.info(f"Loading plant disease model from: {model_path}")
         model = keras.models.load_model(model_path, compile=False)
         
         # Get model info
         input_shape = model.input_shape
         output_shape = model.output_shape
         
-        logger.info(f"✅ Model loaded successfully!")
+        logger.info(f"Model loaded successfully!")
         logger.info(f"   Input shape: {input_shape}")
         logger.info(f"   Output shape: {output_shape}")
         logger.info(f"   Total classes: {output_shape[-1]}")
@@ -134,7 +139,7 @@ def load_plant_disease_model(model_path: str) -> keras.Model:
         return model
         
     except Exception as e:
-        logger.error(f"❌ Failed to load model: {str(e)}")
+        logger.error(f"Failed to load model: {str(e)}")
         raise
 
 
@@ -467,7 +472,7 @@ async def startup_event():
     global plant_disease_model, class_names, class_mapping
     
     try:
-        logger.info("🌿 Initializing Plant Disease Detection Service...")
+        logger.info("[INIT] Initializing Plant Disease Detection Service...")
         
         # Extract class names from dataset
         class_names = extract_class_names_from_dataset(DATASET_PATH)
@@ -484,16 +489,16 @@ async def startup_event():
         
         if model_classes != dataset_classes:
             logger.warning(
-                f"⚠️  Model output classes ({model_classes}) != "
+                f"[WARN] Model output classes ({model_classes}) != "
                 f"Dataset classes ({dataset_classes}). "
                 f"This may cause prediction errors!"
             )
         
-        logger.info("✅ Plant Disease Detection Service initialized successfully!")
+        logger.info("[OK] Plant Disease Detection Service initialized successfully!")
         logger.info(f"   Ready to detect {len(class_names)} disease classes")
         
     except FileNotFoundError as e:
-        logger.warning(f"⚠️  Plant Disease Detection initialization skipped: {str(e)}")
+        logger.warning(f"[SKIP] Plant Disease Detection initialization skipped: {str(e)}")
         logger.warning("   Large model file (547MB) not available - this is expected on Render.")
         logger.warning("   Plant disease detection endpoint will return 503 Service Unavailable.")
         # Don't raise - allow app to start without this feature

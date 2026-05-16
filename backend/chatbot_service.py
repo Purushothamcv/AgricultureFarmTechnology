@@ -199,17 +199,17 @@ def initialize_groq_client():
     global groq_client
     
     if not GROQ_API_KEY:
-        logger.warning("⚠️  GROQ_API_KEY not found - Chatbot service will be unavailable")
+        logger.warning("[SKIP] GROQ_API_KEY not found - Chatbot service will be unavailable")
         logger.warning("   Set GROQ_API_KEY environment variable to enable chatbot")
         groq_client = None
         return False
     
     try:
         groq_client = Groq(api_key=GROQ_API_KEY)
-        logger.info("✅ Groq AI client initialized successfully")
+        logger.info("[OK] Groq AI client initialized successfully")
         return True
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Groq client: {str(e)}")
+        logger.error(f"[ERROR] Failed to initialize Groq client: {str(e)}")
         groq_client = None
         return False
 
