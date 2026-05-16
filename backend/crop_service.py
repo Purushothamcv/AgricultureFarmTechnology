@@ -9,13 +9,20 @@ from typing import Dict, Any, Optional, Tuple
 import joblib
 
 
-# Load the trained crop recommendation model
-try:
-    crop_model = joblib.load("model/crop_model.pkl")
-    print("[OK] Crop model loaded successfully")
-except Exception as e:
-    print(f"[ERROR] Error loading crop model: {e}")
-    crop_model = None
+# Lazy load the trained crop recommendation model
+crop_model = None
+
+def get_crop_model():
+    """Lazy load crop model on first request"""
+    global crop_model
+    if crop_model is None:
+        try:
+            crop_model = joblib.load("model/crop_model.pkl")
+            print("[OK] Crop model loaded successfully")
+        except Exception as e:
+            print(f"[ERROR] Error loading crop model: {e}")
+            crop_model = None
+    return crop_model
 
 
 def predict_crop(nitrogen: float, phosphorus: float, potassium: float,
@@ -36,20 +43,21 @@ def predict_crop(nitrogen: float, phosphorus: float, potassium: float,
     Returns:
         Tuple of (predicted_crop, confidence_score)
     """
-    if crop_model is None:
+    model = get_crop_model()
+    if model is None:
         raise ValueError("Crop model not loaded")
     
     # Prepare input features in the same order as training
     features = np.array([[nitrogen, phosphorus, potassium, temperature, humidity, ph, rainfall, ozone]])
     
     # Make prediction
-    prediction = crop_model.predict(features)[0]
+    prediction = model.predict(features)[0]
     
     # Get confidence score if available
     confidence = None
-    if hasattr(crop_model, 'predict_proba'):
+    if hasattr(model, 'predict_proba'):
         try:
-            proba = crop_model.predict_proba(features)[0]
+            proba = model.predict_proba(features)[0]
             confidence = float(max(proba))
         except:
             pass

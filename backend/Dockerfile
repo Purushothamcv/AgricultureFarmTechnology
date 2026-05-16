@@ -45,8 +45,7 @@ EXPOSE 8000
 # Health check disabled for Render deployment (uses dynamic ports)
 # Render has its own health check mechanism
 
-# Run application with uvicorn in production mode with low-memory optimizations
-# - workers=1: Single worker to save memory
-# - timeout-keep-alive=5: Aggressive keep-alive timeout
-# - timeout-notify=30: Shorter shutdown timeout
-CMD ["sh", "-c", "python -m uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --timeout-keep-alive 5 --timeout-notify 30"]
+# Run application with uvicorn in production mode
+# Direct uvicorn call (not python -m) for proper Render integration
+# Uses single worker by default for 512MB memory constraint
+CMD ["sh", "-c", "uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000}"]
