@@ -1,73 +1,59 @@
 # ============================================
-# RENDER DEPLOYMENT - OPTIMIZED FOR 512MB RAM
+# RENDER DEPLOYMENT - PRODUCTION STABLE
 # ============================================
-# Pinned versions to prevent pip backtracking
-# Minimal dependencies for fast deployment
+# Optimized for Render free tier (512MB RAM)
+# Minimal dependencies, all versions pinned
 
 # Core Web Framework
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+
+# Environment & Configuration
 python-dotenv==1.0.0
-pydantic[email]==2.7.1
+pydantic==2.7.1
 python-multipart==0.0.6
 
-# MongoDB (async driver for non-blocking I/O)
+# Database (MongoDB - no SQL)
 pymongo==4.8.0
 motor==3.5.1
 
-# Authentication & Security
+# Authentication
 bcrypt==4.1.2
-python-jose[cryptography]==3.3.0
+python-jose==3.3.0
+cryptography==42.0.7
 google-auth==2.31.0
 google-auth-oauthlib==1.2.1
-cryptography==42.0.7
 
 # Data Processing
 pandas==2.2.2
 numpy==1.26.4
+
+# HTTP & Utilities
 requests==2.32.3
 httpx==0.28.1
+email-validator==2.3.0
 
-# ML Models (lazy loaded, NOT at startup)
+# ML Models (lazy loaded)
 scikit-learn==1.7.2
 joblib==1.4.2
 xgboost==2.1.1
 pillow==10.4.0
 
-# Email validation
-email-validator==2.3.0
-
-# AI Features - Groq Integration (requires GROQ_API_KEY)
+# AI Integration
 groq==0.9.0
-pydantic-settings==2.2.1
-
-# LangChain ecosystem (optional, for AI enhancements)
-langchain==0.1.20
-langchain-core==0.1.53
-langchain-community==0.0.38
-langchain-groq==0.0.1
 
 # ============================================
-# OPTIONAL: Uncomment for development/testing
+# NOTES
 # ============================================
-# TensorFlow (OPTIONAL - causes memory spikes on Render free tier)
-# Uncomment only if needed for disease detection services
-# tensorflow==2.16.1
-
-# ============================================
-# DEPLOYMENT NOTES
-# ============================================
-# - TensorFlow (2.16.1+) is ~500MB and causes Render free tier crashes
-# - ML models load lazily on first API request, not at startup
-# - All imports use try/except to prevent cascade failures
-# - Render builds with: pip install --no-cache-dir -r requirements.txt
-# - Set environment variables in Render dashboard:
-#   * GROQ_API_KEY: Your API key for chatbot
-#   * LOW_MEMORY_MODE: true (keeps services lightweight)
-#   * TF_CPP_MIN_LOG_LEVEL: 3 (suppress TF startup logs)
-#
-# REMOVED:
-# - sqlalchemy, sqlmodel, alembic (no SQL database)
-# - psycopg2, databases (no PostgreSQL)
-# - streamlit, matplotlib, seaborn (dev only)
-# - plotly, dash, folium (visualization only)
+# - NO TensorFlow (causes Render crashes)
+# - NO SQLAlchemy (not used, causes backtracking)
+# - NO LangChain (use Groq directly instead)
+# - All model loading is lazy (on-demand)
+# - All service imports have try/except fallbacks
+# 
+# Environment variables (set in Render dashboard):
+#   GROQ_API_KEY=sk-...
+#   LOW_MEMORY_MODE=true
+#   MONGODB_URL=mongodb+srv://...
+#   GOOGLE_CLIENT_ID=...
+#   GOOGLE_CLIENT_SECRET=...

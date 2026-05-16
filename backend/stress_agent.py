@@ -4,10 +4,19 @@ Uses Groq LLM to explain ML predictions and provide recommendations
 """
 
 import os
-from langchain_groq import ChatGroq
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
+
+# LAZY LOAD: LangChain imports are optional
+try:
+    from langchain_groq import ChatGroq
+    from langchain_core.prompts import PromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+    ChatGroq = None
+    PromptTemplate = None
+    StrOutputParser = None
 
 load_dotenv()
 
@@ -19,9 +28,13 @@ class StressAgent:
     
     def initialize_llm(self):
         """Initialize Groq LLM"""
+        if not LANGCHAIN_AVAILABLE:
+            print("[SKIP] LangChain not available - stress agent will be unavailable")
+            return False
+        
         try:
             if not self.groq_api_key:
-                print("⚠️ GROQ_API_KEY not found in environment")
+                print("[SKIP] GROQ_API_KEY not found in environment")
                 return False
             
             self.llm = ChatGroq(
@@ -30,10 +43,10 @@ class StressAgent:
                 api_key=self.groq_api_key,
                 top_p=0.95
             )
-            print("✅ Groq LLM initialized successfully")
+            print("[OK] Groq LLM initialized successfully")
             return True
         except Exception as e:
-            print(f"❌ Error initializing Groq LLM: {e}")
+            print(f"[ERROR] Error initializing Groq LLM: {e}")
             return False
     
     def generate_stress_explanation(self, input_data: dict, prediction: dict):
