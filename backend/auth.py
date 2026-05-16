@@ -39,8 +39,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Debug: Log Google OAuth configuration status
 print(f"\n[AUTH] Google OAuth Configuration Status:")
-print(f"  GOOGLE_CLIENT_ID: {'✓ Loaded' if GOOGLE_CLIENT_ID else '✗ MISSING - OAuth will fail'}")
-print(f"  GOOGLE_CLIENT_SECRET: {'✓ Loaded' if GOOGLE_CLIENT_SECRET else '✗ MISSING - OAuth will fail'}")
+print(f"  GOOGLE_CLIENT_ID: {'LOADED' if GOOGLE_CLIENT_ID else 'MISSING - OAuth will fail'}")
+print(f"  GOOGLE_CLIENT_SECRET: {'LOADED' if GOOGLE_CLIENT_SECRET else 'MISSING - OAuth will fail'}")
 print(f"  BACKEND_URL: {BACKEND_URL}")
 print(f"  FRONTEND_URL: {FRONTEND_URL}\n")
 
@@ -243,7 +243,7 @@ def login_user(user_credentials: UserLogin):
                 detail="Invalid email or password"
             )
         
-        print(f"[LOGIN] Password verified successfully ✓")
+        print(f"[LOGIN] Password verified successfully")
         
         # Update last_login timestamp in MongoDB Atlas
         users_collection.update_one(

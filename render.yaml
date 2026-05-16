@@ -66,14 +66,14 @@ services:
     branch: main
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://smartagri-backend.onrender.com  # Update this with your actual backend URL
+        value: https://smartagri-backend-ckcz.onrender.com  # Must match backend service URL in Render
       - key: VITE_GOOGLE_CLIENT_ID
         value: 745305741156-di4f6tc9o7p6773hp21mh60u16m3anik.apps.googleusercontent.com
     
     routes:
       - type: rewrite
         source: /api/*
-        destination: https://smartagri-backend.onrender.com/api/*  # Proxy API requests to backend
+        destination: https://smartagri-backend-ckcz.onrender.com/api/*  # Proxy API requests to backend
       - type: rewrite
         source: /*
         destination: /index.html  # SPA routing support

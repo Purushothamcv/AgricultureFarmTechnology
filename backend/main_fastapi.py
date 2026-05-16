@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env file into environment
 print(f"[DEBUG] Environment Variables Loaded")
-print(f"[DEBUG] GOOGLE_CLIENT_ID: {'✓' if os.getenv('GOOGLE_CLIENT_ID') else '✗ MISSING'}")
-print(f"[DEBUG] GOOGLE_CLIENT_SECRET: {'✓' if os.getenv('GOOGLE_CLIENT_SECRET') else '✗ MISSING'}")
-print(f"[DEBUG] MONGODB_URL: {'✓' if os.getenv('MONGODB_URL') else '✗ MISSING'}")
+print(f"[DEBUG] GOOGLE_CLIENT_ID: {'OK' if os.getenv('GOOGLE_CLIENT_ID') else 'MISSING'}")
+print(f"[DEBUG] GOOGLE_CLIENT_SECRET: {'OK' if os.getenv('GOOGLE_CLIENT_SECRET') else 'MISSING'}")
+print(f"[DEBUG] MONGODB_URL: {'OK' if os.getenv('MONGODB_URL') else 'MISSING'}")
 
 # Add backend directory to path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -190,8 +190,7 @@ else:
     print("[INFO] LOW_MEMORY_MODE disabled - all services will initialize")
 
 app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Support System", version="1.0.0")
-print("[INFO] FastAPI app instance created and ready to bind")
-print("[INFO] Backend is now listening for connections\n")
+print("[INFO] FastAPI app instance created and ready for uvicorn startup")
 
 
 @app.middleware("http")
@@ -208,10 +207,16 @@ async def catch_unhandled_exceptions(request, call_next):
 # Background initialization task (doesn't block port binding)
 async def initialize_services_background():
     """Initialize all services in the background (non-blocking)"""
-    print("\n[BACKGROUND] Starting service initialization...")
-    
-    if LOW_MEMORY_MODE:
-        print("[WARN] LOW_MEMORY_MODE: Skipping heavy TensorFlow model loading")
+    try:
+        print("\n[BACKGROUND] Starting service initialization...")
+        
+        if LOW_MEMORY_MODE:
+            print("[WARN] LOW_MEMORY_MODE: Skipping heavy TensorFlow model loading")
+    except Exception as e:
+        print(f"[ERROR] Exception in background initialization setup: {e}")
+        import traceback
+        traceback.print_exc()
+        return
     
     # Initialize each service with error handling
     # Skip TensorFlow models in low memory mode
@@ -306,6 +311,8 @@ async def initialize_services_background():
             print("[OK] Fertilizer service initialized")
         except Exception as e:
             print(f"[WARN] Fertilizer service failed: {e}")
+            import traceback
+            traceback.print_exc()
     elif LOW_MEMORY_MODE:
         print("[SKIP] Fertilizer service (low memory mode)")
     
@@ -315,20 +322,28 @@ async def initialize_services_background():
 @app.on_event("startup")
 async def startup_event():
     """Quick startup - only connect MongoDB, defer service initialization"""
-    print("\n[START] Starting SmartAgri API (fast startup mode)...\n")
-    
-    # MongoDB connection with error handling - don't block startup if it fails
     try:
-        await connect_to_mongodb()
-        print("[OK] MongoDB Connected")
+        print("\n[START] Starting SmartAgri API (fast startup mode)...\n")
+        
+        # MongoDB connection with error handling - don't block startup if it fails
+        try:
+            await connect_to_mongodb()
+            print("[OK] MongoDB Connected")
+        except Exception as e:
+            print(f"[WARN] MongoDB connection failed: {e}")
+            import traceback
+            traceback.print_exc()
+            print("[WARN] Continuing startup - database operations will fail until connection restored")
+        
+        # START service initialization in background (doesn't block port binding)
+        asyncio.create_task(initialize_services_background())
+        
+        print("\n[OK] Port ready - services loading in background...\n")
     except Exception as e:
-        print(f"[WARN] MongoDB connection failed: {e}")
-        print("[WARN] Continuing startup - database operations will fail until connection restored")
-    
-    # START service initialization in background (doesn't block port binding)
-    asyncio.create_task(initialize_services_background())
-    
-    print("\n[OK] Port ready - services loading in background...\n")
+        print(f"\n[ERROR] CRITICAL: Startup event failed with exception: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # Re-raise to let FastAPI/uvicorn handle it
 
 @app.on_event("shutdown")
 async def shutdown_event():
