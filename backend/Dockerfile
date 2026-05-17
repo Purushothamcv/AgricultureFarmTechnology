@@ -45,7 +45,8 @@ EXPOSE 8000
 # Health check disabled for Render deployment (uses dynamic ports)
 # Render has its own health check mechanism
 
-# Run application with uvicorn in production mode
-# Direct uvicorn call (not python -m) for proper Render integration
+# Run application with startup script
+# Properly reads PORT environment variable from Render
+# Handles port binding BEFORE heavy operations
 # Uses single worker by default for 512MB memory constraint
-CMD ["sh", "-c", "uvicorn main_fastapi:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["python", "startup_render.py"]

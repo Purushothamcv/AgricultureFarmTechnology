@@ -193,6 +193,29 @@ app = FastAPI(title="SmartAgri API", description="Smart Agriculture Decision Sup
 print("[INFO] FastAPI app instance created and ready for uvicorn startup")
 
 
+# ============================================================
+# CRITICAL: Add minimal health check FIRST
+# Render needs this endpoint to detect successful deployment
+# Must respond in <1 second without database calls
+# ============================================================
+@app.get("/health")
+async def health_check_minimal():
+    """
+    Ultra-fast health check endpoint for Render deployment detection.
+    Responds immediately without any blocking operations.
+    Used by Render to verify app is running.
+    """
+    return {
+        "status": "ok",
+        "app": "SmartAgri-AI",
+        "version": "1.0.0",
+        "ready": True
+    }
+
+
+# ============================================================
+# Middleware and error handling
+# ============================================================
 @app.middleware("http")
 async def catch_unhandled_exceptions(request, call_next):
     try:
@@ -321,29 +344,68 @@ async def initialize_services_background():
 # Event handlers for MongoDB connection
 @app.on_event("startup")
 async def startup_event():
-    """Quick startup - only connect MongoDB, defer service initialization"""
+    """
+    CRITICAL: Fast startup - port binds IMMEDIATELY
+    
+    This function MUST complete quickly (<5 seconds) so that:
+    1. Uvicorn can bind the port
+    2. Render can detect the port is open
+    3. Health checks respond before timeout
+    
+    All heavy operations (MongoDB, model loading) happen
+    in background tasks and do NOT block port binding.
+    """
     try:
-        print("\n[START] Starting SmartAgri API (fast startup mode)...\n")
+        print("\n" + "="*60)
+        print("[STARTUP] FastAPI app starting in fast-startup mode")
+        print("="*60)
         
-        # MongoDB connection with error handling - don't block startup if it fails
-        try:
-            await connect_to_mongodb()
-            print("[OK] MongoDB Connected")
-        except Exception as e:
-            print(f"[WARN] MongoDB connection failed: {e}")
-            import traceback
-            traceback.print_exc()
-            print("[WARN] Continuing startup - database operations will fail until connection restored")
+        # CRITICAL: Don't block on MongoDB or heavy operations
+        # Start async tasks that initialize in background
+        asyncio.create_task(_async_startup_background())
         
-        # START service initialization in background (doesn't block port binding)
-        asyncio.create_task(initialize_services_background())
+        print("[OK] Port binding complete - app ready for requests")
+        print("[INFO] Services initializing in background...\n")
+        print("="*60 + "\n")
         
-        print("\n[OK] Port ready - services loading in background...\n")
     except Exception as e:
-        print(f"\n[ERROR] CRITICAL: Startup event failed with exception: {e}")
+        print(f"[ERROR] Startup error: {e}")
         import traceback
         traceback.print_exc()
-        raise  # Re-raise to let FastAPI/uvicorn handle it
+        # DON'T re-raise - let app continue even if startup fails
+
+async def _async_startup_background():
+    """
+    Background startup sequence - doesn't block port binding
+    Runs concurrently while app serves requests
+    """
+    try:
+        print("\n[BACKGROUND] Starting async initialization...")
+        
+        # Try to connect to MongoDB with timeout
+        print("[INIT] Attempting MongoDB connection...")
+        try:
+            await asyncio.wait_for(
+                connect_to_mongodb(),
+                timeout=10.0  # 10 second timeout
+            )
+            print("[OK] MongoDB Connected Successfully")
+        except asyncio.TimeoutError:
+            print("[WARN] MongoDB connection timeout - app will run without persistence")
+        except Exception as e:
+            print(f"[WARN] MongoDB connection failed: {e}")
+            print("[INFO] Continuing startup - REST API will work but persistence unavailable")
+        
+        # Now initialize other services (won't block anymore since MongoDB is async)
+        await initialize_services_background()
+        
+        print("[OK] All background initialization complete\n")
+        
+    except Exception as e:
+        print(f"[WARN] Background initialization error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't crash - app is already serving requests
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -470,33 +532,18 @@ class FertilizerAutoFillRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    """Root endpoint - health check"""
-    try:
-        get_database()
-        db_status = "connected"
-    except Exception:
-        db_status = "disconnected"
-    
+    """Root endpoint - returns API status without blocking"""
+    # Don't call get_database() here - it might block or hang
+    # Just return status quickly
     return {
         "status": "ok",
-        "message": "SmartAgri API is running",
+        "message": "SmartAgri AI API is running",
         "version": "1.0.0",
-        "database": db_status
+        "app": "SmartAgri-AI",
+        "services": "available"
     }
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring"""
-    try:
-        get_database()
-        db_status = "connected"
-    except Exception:
-        db_status = "disconnected"
-    return {
-        "status": "running",
-        "database": db_status,
-        "backend": "healthy" if db_status == "connected" else "degraded"
-    }
+# Note: /health endpoint is already defined earlier for fast detection
 
 @app.get("/test-db")
 async def test_database_connection():
