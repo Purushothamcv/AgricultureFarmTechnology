@@ -192,6 +192,38 @@ try:
 except Exception as e:
     print(f"[SKIP] Agentic AI service: {e}")
 
+# NEW: Fertilizer prediction service (PHASE 6 Extension)
+fertilizer_router = None
+try:
+    from api_fertilizer import router as fertilizer_router
+    print("[OK] Fertilizer service imported")
+except Exception as e:
+    print(f"[SKIP] Fertilizer service: {e}")
+
+# NEW: Stress prediction service (PHASE 6 Extension)
+stress_router = None
+try:
+    from api_stress import router as stress_router
+    print("[OK] Stress service imported")
+except Exception as e:
+    print(f"[SKIP] Stress service: {e}")
+
+# NEW: Yield API service (PHASE 6 Extension)
+yield_router = None
+try:
+    from api_yield import router as yield_router
+    print("[OK] Yield API service imported")
+except Exception as e:
+    print(f"[SKIP] Yield API service: {e}")
+
+# NEW: Fruit disease API v2 (PHASE 6 Extension)
+fruit_disease_v2_router = None
+try:
+    from fruit_disease_api_v2 import router as fruit_disease_v2_router
+    print("[OK] Fruit disease API v2 imported")
+except Exception as e:
+    print(f"[SKIP] Fruit disease API v2: {e}")
+
 print("\n[OK] Optional services loaded")
 
 # ============================================================
@@ -206,6 +238,10 @@ if auth_router:
 if fruit_disease_router:
     app.include_router(fruit_disease_router)
     print("[OK] Fruit disease routes registered")
+
+if fruit_disease_v2_router:
+    app.include_router(fruit_disease_v2_router)
+    print("[OK] Fruit disease v2 routes registered")
 
 if plant_disease_router:
     app.include_router(plant_disease_router)
@@ -222,6 +258,18 @@ if chatbot_router:
 if agentic_router:
     app.include_router(agentic_router)
     print("[OK] Agentic AI routes registered")
+
+if fertilizer_router:
+    app.include_router(fertilizer_router)
+    print("[OK] Fertilizer routes registered")
+
+if stress_router:
+    app.include_router(stress_router)
+    print("[OK] Stress routes registered")
+
+if yield_router:
+    app.include_router(yield_router)
+    print("[OK] Yield API routes registered")
 
 print("[OK] All available routes registered")
 
