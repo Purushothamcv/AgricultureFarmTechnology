@@ -3,85 +3,69 @@
 SmartAgri-AI Startup Script for Render Deployment
 =================================================
 
-Purpose:
-  1. Read PORT from environment variable (Render sets this dynamically)
-  2. Start FastAPI app on the correct port
-  3. Ensure port binds BEFORE attempting heavy operations
-  4. Proper event loop configuration for 512MB memory constraint
+Minimalist production startup for Render free tier.
+Prioritizes stability and immediate port binding.
 
-Usage (in Dockerfile):
-  CMD ["python", "startup_render.py"]
-
-Environment Variables:
-  - PORT: Dynamic port assigned by Render (default 8000)
-  - LOW_MEMORY_MODE: Skip heavy model loading (default true)
-  - MONGODB_URL: MongoDB Atlas connection string
+CRITICAL: This script MUST:
+1. Read PORT from environment variable
+2. Bind to port IMMEDIATELY
+3. Not block before port binding
+4. Handle all exceptions gracefully
 """
 
 import os
 import sys
-import logging
-from pathlib import Path
-
-# Configure logging early
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(levelname)s] %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 def main():
     """
-    Main startup function - handles PORT correctly for Render
+    Main entry point for Render deployment.
+    Simple, stable, minimal configuration.
     """
     
-    # CRITICAL: Read PORT from environment
-    # Render assigns a dynamic PORT value
+    # Get port - Render sets PORT in environment
     port_str = os.getenv("PORT", "8000")
     try:
         port = int(port_str)
-    except ValueError:
-        logger.error(f"Invalid PORT value: {port_str}. Using default 8000")
+    except (ValueError, TypeError):
+        print(f"[WARN] Invalid PORT: {port_str}, using 8000")
         port = 8000
     
-    host = os.getenv("HOST", "0.0.0.0")
+    host = "0.0.0.0"
     
-    # Verify .env exists for local dev (not needed on Render, but safe)
-    env_file = Path(".env")
-    has_env = env_file.exists()
+    print("\n" + "="*60)
+    print(f"[STARTUP] SmartAgri Backend")
+    print(f"[STARTUP] Binding to {host}:{port}")
+    print(f"[STARTUP] LOW_MEMORY_MODE: {os.getenv('LOW_MEMORY_MODE', 'true')}")
+    print("="*60 + "\n")
     
-    logger.info("=" * 60)
-    logger.info("SmartAgri-AI Backend Startup")
-    logger.info("=" * 60)
-    logger.info(f"Host: {host}")
-    logger.info(f"Port: {port}")
-    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    logger.info(f"Low Memory Mode: {os.getenv('LOW_MEMORY_MODE', 'true')}")
-    logger.info(f"Environment File (.env): {'Found' if has_env else 'Not found (using system env)'}")
-    logger.info("=" * 60)
-    
-    # Import uvicorn and run
+    # Import uvicorn
     try:
         import uvicorn
-        
-        # Run with optimized settings for Render
+    except ImportError:
+        print("[ERROR] uvicorn not installed")
+        sys.exit(1)
+    
+    # Run uvicorn with MINIMAL settings for stability
+    try:
         uvicorn.run(
-            "main_fastapi:app",
+            app="main_fastapi:app",
             host=host,
             port=port,
-            workers=1,  # Single worker for 512MB constraint
-            loop="uvloop",  # Faster event loop (uvloop in requirements.txt)
+            # Minimal, stable settings only:
+            workers=1,  # Single worker for 512MB
             log_level="info",
-            access_log=True,  # Log all requests
-            server_header=True,
-            date_header=True,
-            env_file=".env" if has_env else None
+            access_log=False,  # Disable access log (less I/O)
+            # REMOVED: loop, interface, reload, and other settings
+            # These can cause compatibility issues on Render
         )
+    except SystemExit:
+        # uvicorn.run calls sys.exit - let it propagate
+        raise
     except KeyboardInterrupt:
-        logger.info("Shutdown signal received")
+        print("\n[INFO] Shutdown signal received")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        print(f"[ERROR] Fatal error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -347,32 +347,30 @@ async def startup_event():
     """
     CRITICAL: Fast startup - port binds IMMEDIATELY
     
-    This function MUST complete quickly (<5 seconds) so that:
+    Must return quickly (<2 seconds) so that:
     1. Uvicorn can bind the port
-    2. Render can detect the port is open
-    3. Health checks respond before timeout
-    
-    All heavy operations (MongoDB, model loading) happen
-    in background tasks and do NOT block port binding.
+    2. Render's health check passes
+    3. No timeouts before app is ready
     """
     try:
         print("\n" + "="*60)
-        print("[STARTUP] FastAPI app starting in fast-startup mode")
+        print("[STARTUP] FastAPI app ready for requests")
         print("="*60)
         
-        # CRITICAL: Don't block on MongoDB or heavy operations
-        # Start async tasks that initialize in background
+        # Schedule background initialization (non-blocking)
         asyncio.create_task(_async_startup_background())
         
-        print("[OK] Port binding complete - app ready for requests")
-        print("[INFO] Services initializing in background...\n")
+        print("[OK] Port binding complete\n")
         print("="*60 + "\n")
         
     except Exception as e:
-        print(f"[ERROR] Startup error: {e}")
-        import traceback
-        traceback.print_exc()
-        # DON'T re-raise - let app continue even if startup fails
+        # Never re-raise startup errors - let app continue
+        print(f"[WARN] Startup setup error: {e}")
+        # Still schedule background work even if there was an error
+        try:
+            asyncio.create_task(_async_startup_background())
+        except:
+            print("[WARN] Could not schedule background tasks")
 
 async def _async_startup_background():
     """
