@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import glob
 import os
 
@@ -15,4 +15,4 @@ combined_df = pd.concat(all_dfs, ignore_index=True)
 
 # Save to a new CSV
 combined_df.to_csv('combined_potato_disease_data.csv', index=False)
-print('✅ All CSV files combined into combined_potato_disease_data.csv')
+print('[SUCCESS] All CSV files combined into combined_potato_disease_data.csv')

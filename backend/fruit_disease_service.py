@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection FastAPI Service
 =======================================
 REST API endpoints for fruit disease prediction
@@ -46,7 +46,7 @@ def get_predictor():
             logger.info("Loading fruit disease model...")
             predictor = FruitDiseasePredictor()
             logger.info("Fruit disease model loaded successfully")
-            logger.info("✓ Predictor initialized successfully")
+            logger.info("[OK] Predictor initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize predictor: {e}")
             return None
@@ -319,6 +319,6 @@ async def startup_event():
     logger.info("Starting Fruit Disease Detection Service...")
     try:
         get_predictor()
-        logger.info("✓ Service ready")
+        logger.info("[OK] Service ready")
     except Exception as e:
-        logger.error(f"✗ Service initialization failed: {e}")
+        logger.error(f"[FAIL] Service initialization failed: {e}")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Dataset Analysis Utility
 ======================================
 Helper functions for dataset exploration, validation, and visualization
@@ -95,7 +95,7 @@ class DatasetAnalyzer:
             stats['min_samples'] = min(stats['min_samples'], num_images)
             stats['max_samples'] = max(stats['max_samples'], num_images)
             
-            print(f"✓ {class_name:50s} : {num_images:5d} images")
+            print(f"[OK] {class_name:50s} : {num_images:5d} images")
         
         stats['total_classes'] = len(stats['classes'])
         stats['avg_samples'] = stats['total_images'] / stats['total_classes'] if stats['total_classes'] > 0 else 0
@@ -148,7 +148,7 @@ class DatasetAnalyzer:
         
         print(f"\nImbalance Ratio: {imbalance_ratio:.3f}")
         print(f"Threshold:       {threshold}")
-        print(f"Status:          {'✅ BALANCED' if is_balanced else '⚠️  IMBALANCED'}")
+        print(f"Status:          {'[SUCCESS] BALANCED' if is_balanced else '[WARN]️  IMBALANCED'}")
         
         if not is_balanced:
             print("\n💡 Recommendations:")
@@ -209,7 +209,7 @@ class DatasetAnalyzer:
         # Save or show
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✓ Distribution plot saved to: {save_path}")
+            print(f"[OK] Distribution plot saved to: {save_path}")
         else:
             plt.show()
         
@@ -242,8 +242,8 @@ class DatasetAnalyzer:
             print(f"❌ No class directories found in: {self.dataset_path}")
             return False
         
-        print(f"\n✅ Dataset structure is valid")
-        print(f"✓ Found {len(subdirs)} class directories")
+        print(f"\n[SUCCESS] Dataset structure is valid")
+        print(f"[OK] Found {len(subdirs)} class directories")
         
         # Check for empty directories
         empty_dirs = []
@@ -254,7 +254,7 @@ class DatasetAnalyzer:
                 empty_dirs.append(subdir)
         
         if empty_dirs:
-            print(f"\n⚠️  Warning: {len(empty_dirs)} empty directories found:")
+            print(f"\n[WARN]️  Warning: {len(empty_dirs)} empty directories found:")
             for d in empty_dirs:
                 print(f"   - {d}")
         
@@ -286,7 +286,7 @@ class DatasetAnalyzer:
         with open(output_path, 'w') as f:
             json.dump(export_data, f, indent=4)
         
-        print(f"✓ Statistics exported to: {output_path}")
+        print(f"[OK] Statistics exported to: {output_path}")
 
 
 def main():
@@ -330,7 +330,7 @@ def main():
         analyzer.export_stats(stats_path)
         
         print("\n" + "="*70)
-        print("✅ Dataset analysis completed successfully!")
+        print("[SUCCESS] Dataset analysis completed successfully!")
         print("="*70 + "\n")
         
     except Exception as e:

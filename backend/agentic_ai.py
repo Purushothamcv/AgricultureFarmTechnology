@@ -1,4 +1,4 @@
-"""
+﻿"""
 Agentic AI Crop Fetching Module
 Uses APY.csv + Groq LLM to return relevant crops for a given state/district.
 """
@@ -31,9 +31,9 @@ class AgenticCropService:
         self._load_dataset()
         if self.groq_api_key:
             self.client = Groq(api_key=self.groq_api_key)
-            print(f"🤖 Agentic AI Groq client ready ({self.groq_model})")
+            print(f"[BOT] Agentic AI Groq client ready ({self.groq_model})")
         else:
-            print("⚠️  Agentic AI: GROQ_API_KEY not set, using dataset-only fallback")
+            print("[WARN]️  Agentic AI: GROQ_API_KEY not set, using dataset-only fallback")
 
     def _load_dataset(self) -> None:
         """Load and clean APY dataset once at startup."""
@@ -58,7 +58,7 @@ class AgenticCropService:
         df = df[df["State"] != ""]
 
         self.df = df
-        print(f"✅ Agentic AI dataset loaded: {len(df):,} rows")
+        print(f"[SUCCESS] Agentic AI dataset loaded: {len(df):,} rows")
 
     def _normalize(self, value: Optional[str]) -> str:
         return (value or "").strip().title()
@@ -201,7 +201,7 @@ class AgenticCropService:
             )
 
             response_text = completion.choices[0].message.content or ""
-            print(f"🤖 Agentic AI raw LLM response: {response_text}")
+            print(f"[BOT] Agentic AI raw LLM response: {response_text}")
 
             llm_crops = self._parse_llm_crops(response_text)[:llm_limit]
             final_crops = list(dict.fromkeys(dataset_crops + llm_crops))[:max_total]
@@ -214,7 +214,7 @@ class AgenticCropService:
                 "source": "hybrid"
             }
         except Exception as e:
-            print(f"⚠️  Agentic AI Groq error: {e}")
+            print(f"[WARN]️  Agentic AI Groq error: {e}")
             direct = dataset_crops[:max_total]
             self.cache[cache_key] = direct
             return {
@@ -238,7 +238,7 @@ def get_agentic_service() -> AgenticCropService:
 
 async def startup_event() -> None:
     """Initialize agentic AI service at app startup."""
-    print("🤖 Initializing Agentic AI Crop Service...")
+    print("[BOT] Initializing Agentic AI Crop Service...")
     service = get_agentic_service()
     service.startup()
 
@@ -269,3 +269,4 @@ async def get_agent_crops(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agentic crop fetch failed: {str(e)}")
+

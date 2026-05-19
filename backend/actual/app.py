@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import requests
 import joblib
@@ -101,7 +101,7 @@ def load_fields():
                     return {}
                 return json.loads(content)
         except json.JSONDecodeError:
-            st.warning("⚠️ 'fields.json' is corrupted. Resetting field data.")
+            st.warning("[WARN]️ 'fields.json' is corrupted. Resetting field data.")
             return {}
     return {}
 
@@ -138,7 +138,7 @@ if map_data and map_data["last_clicked"]:
         else:
             fields[field_name] = {"lat": lat, "lon": lon}
             save_fields(fields)
-            st.success(f"✅ Field '{field_name}' saved successfully!")
+            st.success(f"[SUCCESS] Field '{field_name}' saved successfully!")
 
 # 📂 View Saved Fields
 st.subheader("📂 View Saved Fields")

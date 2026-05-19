@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """MongoDB Atlas Connection Diagnostics"""
 import socket
 import subprocess
@@ -14,7 +14,7 @@ print("-" * 70)
 try:
     host = "cluster0.bpdrfrc.mongodb.net"
     ip = socket.gethostbyname(host)
-    print(f"✅ DNS Resolved: {host} → {ip}")
+    print(f"[SUCCESS] DNS Resolved: {host} → {ip}")
 except socket.gaierror as e:
     print(f"❌ DNS Failed: {e}")
     print("   → MongoDB Atlas hostname is not resolving")
@@ -32,7 +32,7 @@ try:
         text=True
     )
     if result.returncode == 0:
-        print(f"✅ Ping successful to {host}")
+        print(f"[SUCCESS] Ping successful to {host}")
     else:
         print(f"❌ Ping failed to {host}")
         print(f"   Output: {result.stdout}")
@@ -50,7 +50,7 @@ try:
     result = sock.connect_ex((ip, 27017))
     
     if result == 0:
-        print(f"✅ Port 27017 is OPEN on {host}")
+        print(f"[SUCCESS] Port 27017 is OPEN on {host}")
     else:
         print(f"❌ Port 27017 REFUSED/UNREACHABLE on {host}")
         print("   Possible causes:")
@@ -78,7 +78,7 @@ load_dotenv()
 
 mongodb_url = os.getenv("MONGODB_URL")
 if mongodb_url:
-    print(f"✅ MONGODB_URL is set")
+    print(f"[SUCCESS] MONGODB_URL is set")
     print(f"   {mongodb_url[:70]}...")
     
     # Extract username from URL
@@ -93,9 +93,9 @@ else:
 print("\n[TEST 5] MongoDB Atlas Credentials")
 print("-" * 70)
 if "Purushotham:Purushotham123" in (mongodb_url or ""):
-    print(f"✅ Credentials format: Purushotham (username exists)")
+    print(f"[SUCCESS] Credentials format: Purushotham (username exists)")
     print(f"   These are the credentials in your connection string")
-    print(f"   ⚠️  Verify these match your MongoDB Atlas user account")
+    print(f"   [WARN]️  Verify these match your MongoDB Atlas user account")
 else:
     print(f"❌ Credentials not found in connection string")
 
@@ -103,9 +103,9 @@ print("\n" + "=" * 70)
 print("Diagnostic Summary")
 print("=" * 70)
 print("\nIf tests show:")
-print("✅ DNS Resolved: Your system can reach MongoDB Atlas")
-print("✅ Ping successful: Network path is working")
-print("✅ Port 27017 OPEN: IP is whitelisted and cluster is accessible")
+print("[SUCCESS] DNS Resolved: Your system can reach MongoDB Atlas")
+print("[SUCCESS] Ping successful: Network path is working")
+print("[SUCCESS] Port 27017 OPEN: IP is whitelisted and cluster is accessible")
 print("   → Move to Python connection test")
 print()
 print("If tests show:")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 MongoDB Connection Module - WORKING VERSION
 Supports both local MongoDB and MongoDB Atlas
 Automatically falls back to local if Atlas fails
@@ -76,7 +76,7 @@ async def connect_to_mongodb():
         # Create indexes
         await create_indexes()
         
-        logger.info(f"✅ MongoDB connected successfully!")
+        logger.info(f"[SUCCESS] MongoDB connected successfully!")
         logger.info(f"   Users DB: {USERS_DATABASE_NAME}")
         logger.info(f"   Chatbot DB: {CHATBOT_DATABASE_NAME}")
         
@@ -102,9 +102,9 @@ async def create_indexes():
         await chat_collection.create_index("session_id", unique=True)
         await chat_collection.create_index("user_id")
         
-        logger.info("✅ Database indexes created")
+        logger.info("[SUCCESS] Database indexes created")
     except Exception as e:
-        logger.warning(f"⚠️  Index creation warning: {e}")
+        logger.warning(f"[WARN]️  Index creation warning: {e}")
 
 
 async def close_mongodb():
@@ -112,7 +112,7 @@ async def close_mongodb():
     global client
     if client:
         client.close()
-        logger.info("✅ MongoDB connection closed")
+        logger.info("[SUCCESS] MongoDB connection closed")
 
 
 def get_users_db() -> AsyncIOMotorDatabase:

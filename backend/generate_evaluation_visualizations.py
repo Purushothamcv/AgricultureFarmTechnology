@@ -1,4 +1,4 @@
-"""
+﻿"""
 Smart AGRI - Model Evaluation & Accuracy Comparison Visualizations
 Generates professional graphs for all ML/DL models suitable for IEEE papers and technical reports
 """
@@ -51,28 +51,28 @@ class SmartAgriEvaluationVisualizer:
         if yield_metrics_path.exists():
             with open(yield_metrics_path, 'r') as f:
                 self.metrics_data['yield'] = json.load(f)
-                print("✓ Yield model metrics loaded")
+                print("[OK] Yield model metrics loaded")
         
         # Load Fertilizer metrics
         fertilizer_metrics_path = self.model_dir / "fertilizer_model_metrics.json"
         if fertilizer_metrics_path.exists():
             with open(fertilizer_metrics_path, 'r') as f:
                 self.metrics_data['fertilizer'] = json.load(f)
-                print("✓ Fertilizer model metrics loaded")
+                print("[OK] Fertilizer model metrics loaded")
         
         # Load Training history
         training_history_path = self.model_dir / "training_history.json"
         if training_history_path.exists():
             with open(training_history_path, 'r') as f:
                 self.metrics_data['training_history'] = json.load(f)
-                print("✓ Training history loaded")
+                print("[OK] Training history loaded")
         
         # Load Fruit disease labels
         fruit_labels_path = self.model_dir / "fruit_disease_labels.json"
         if fruit_labels_path.exists():
             with open(fruit_labels_path, 'r') as f:
                 self.metrics_data['fruit_labels'] = json.load(f)
-                print("✓ Fruit disease labels loaded")
+                print("[OK] Fruit disease labels loaded")
     
     def parse_classification_report(self, report_path):
         """Parse sklearn classification report text file"""
@@ -125,7 +125,7 @@ class SmartAgriEvaluationVisualizer:
     def plot_yield_model_performance(self):
         """Generate yield prediction model performance visualizations"""
         if 'yield' not in self.metrics_data:
-            print("⚠ Yield metrics not available")
+            print("[WARN] Yield metrics not available")
             return
         
         metrics = self.metrics_data['yield']
@@ -211,13 +211,13 @@ class SmartAgriEvaluationVisualizer:
         plt.tight_layout()
         output_path = self.output_dir / 'yield_model_performance.png'
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Yield model visualization saved: {output_path}")
+        print(f"[OK] Yield model visualization saved: {output_path}")
         plt.close()
     
     def plot_fertilizer_model_performance(self):
         """Generate fertilizer recommendation model performance visualizations"""
         if 'fertilizer' not in self.metrics_data:
-            print("⚠ Fertilizer metrics not available")
+            print("[WARN] Fertilizer metrics not available")
             return
         
         metrics = self.metrics_data['fertilizer']
@@ -305,19 +305,19 @@ class SmartAgriEvaluationVisualizer:
         plt.tight_layout()
         output_path = self.output_dir / 'fertilizer_model_performance.png'
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Fertilizer model visualization saved: {output_path}")
+        print(f"[OK] Fertilizer model visualization saved: {output_path}")
         plt.close()
     
     def plot_fruit_disease_performance(self):
         """Generate fruit disease detection model performance visualizations"""
         report_path = self.model_dir / "classification_report.txt"
         if not report_path.exists():
-            print("⚠ Fruit disease classification report not available")
+            print("[WARN] Fruit disease classification report not available")
             return
         
         report_data = self.parse_classification_report(report_path)
         if not report_data:
-            print("⚠ Could not parse fruit disease report")
+            print("[WARN] Could not parse fruit disease report")
             return
         
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -427,18 +427,18 @@ class SmartAgriEvaluationVisualizer:
         plt.tight_layout()
         output_path = self.output_dir / 'fruit_disease_model_performance.png'
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Fruit disease model visualization saved: {output_path}")
+        print(f"[OK] Fruit disease model visualization saved: {output_path}")
         plt.close()
     
     def plot_deep_learning_training_history(self):
         """Generate training history visualizations for deep learning models"""
         if 'training_history' not in self.metrics_data:
-            print("⚠ Training history not available")
+            print("[WARN] Training history not available")
             return
         
         history = self.metrics_data['training_history'].get('phase1', {})
         if not history:
-            print("⚠ Phase 1 training history not found")
+            print("[WARN] Phase 1 training history not found")
             return
         
         epochs = range(1, len(history['accuracy']) + 1)
@@ -498,7 +498,7 @@ class SmartAgriEvaluationVisualizer:
         plt.tight_layout()
         output_path = self.output_dir / 'deep_learning_training_history.png'
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Deep learning training history saved: {output_path}")
+        print(f"[OK] Deep learning training history saved: {output_path}")
         plt.close()
     
     def plot_model_comparison_dashboard(self):
@@ -647,7 +647,7 @@ Model: EfficientNet-B0"""
         plt.tight_layout()
         output_path = self.output_dir / 'model_comparison_dashboard.png'
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Model comparison dashboard saved: {output_path}")
+        print(f"[OK] Model comparison dashboard saved: {output_path}")
         plt.close()
     
     def generate_all_visualizations(self):
@@ -663,7 +663,7 @@ Model: EfficientNet-B0"""
         self.plot_model_comparison_dashboard()
         
         print("\n" + "="*70)
-        print(f"✅ All visualizations generated successfully!")
+        print(f"[SUCCESS] All visualizations generated successfully!")
         print(f"📁 Output directory: {self.output_dir.absolute()}")
         print("="*70 + "\n")
 

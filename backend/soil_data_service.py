@@ -1,4 +1,4 @@
-"""
+﻿"""
 Soil Data Service
 Fetches soil characteristics from external APIs for map-based location selection
 """
@@ -51,7 +51,7 @@ class SoilDataService:
             if soil_data:
                 result.update(soil_data)
         except Exception as e:
-            print(f"⚠️ SoilGrids API error: {e}")
+            print(f"[WARN]️ SoilGrids API error: {e}")
         
         # 2. Fetch elevation from OpenTopography/OpenElevation API
         try:
@@ -59,7 +59,7 @@ class SoilDataService:
             if elevation is not None:
                 result["elevation"] = elevation
         except Exception as e:
-            print(f"⚠️ Elevation API error: {e}")
+            print(f"[WARN]️ Elevation API error: {e}")
         
         # 3. Estimate soil moisture if not available (using simple heuristics)
         if result["soil_moisture"] is None:
@@ -68,7 +68,7 @@ class SoilDataService:
                 if estimated_moisture is not None:
                     result["soil_moisture"] = estimated_moisture
             except Exception as e:
-                print(f"⚠️ Soil moisture estimation error: {e}")
+                print(f"[WARN]️ Soil moisture estimation error: {e}")
         
         # Cache the result
         self.cache[cache_key] = (result, time.time())
@@ -184,18 +184,18 @@ class SoilDataService:
                                 result["electrical_conductivity"] = round((cec_value / 10) / 50, 2)
                                 break
                 
-                print(f"✅ SoilGrids data fetched successfully")
+                print(f"[SUCCESS] SoilGrids data fetched successfully")
                 return result
             
             else:
-                print(f"⚠️ SoilGrids API returned status {response.status_code}")
+                print(f"[WARN]️ SoilGrids API returned status {response.status_code}")
                 return None
                 
         except requests.Timeout:
-            print("⚠️ SoilGrids API timeout")
+            print("[WARN]️ SoilGrids API timeout")
             return None
         except Exception as e:
-            print(f"⚠️ SoilGrids API error: {e}")
+            print(f"[WARN]️ SoilGrids API error: {e}")
             return None
     
     def _classify_soil_texture(self, clay: float, sand: float, silt: float) -> str:
@@ -254,13 +254,13 @@ class SoilDataService:
                 results = data.get('results', [])
                 if results and len(results) > 0:
                     elevation = results[0].get('elevation')
-                    print(f"✅ Elevation data fetched: {elevation}m")
+                    print(f"[SUCCESS] Elevation data fetched: {elevation}m")
                     return elevation
             
             return None
             
         except Exception as e:
-            print(f"⚠️ Elevation fetch error: {e}")
+            print(f"[WARN]️ Elevation fetch error: {e}")
             return None
     
     def _estimate_soil_moisture(self, latitude: float, longitude: float) -> Optional[float]:
@@ -309,13 +309,13 @@ class SoilDataService:
                 estimated_moisture = base_moisture + rain_factor + temp_factor
                 estimated_moisture = min(100, max(0, estimated_moisture))  # Clamp to 0-100
                 
-                print(f"✅ Estimated soil moisture: {estimated_moisture:.1f}%")
+                print(f"[SUCCESS] Estimated soil moisture: {estimated_moisture:.1f}%")
                 return round(estimated_moisture, 1)
             
             return None
             
         except Exception as e:
-            print(f"⚠️ Soil moisture estimation error: {e}")
+            print(f"[WARN]️ Soil moisture estimation error: {e}")
             return None
 
 

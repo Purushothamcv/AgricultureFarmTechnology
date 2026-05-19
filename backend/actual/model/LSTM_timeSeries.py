@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tensorflow.keras.models import Sequential
@@ -49,5 +49,5 @@ model.fit(X_train, y_train, epochs=30, batch_size=32, validation_split=0.2)
 
 # Save model
 model.save('potato_disease_lstm_model.h5')
-print("✅ Model trained and saved as 'potato_disease_lstm_model.h5'")
+print("[SUCCESS] Model trained and saved as 'potato_disease_lstm_model.h5'")
  

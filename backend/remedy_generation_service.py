@@ -1,4 +1,4 @@
-"""
+﻿"""
 Disease Remedy Generation Service
 ==================================
 Uses comprehensive disease database and Groq LLM to provide detailed disease remedies, pesticide suggestions, and prevention tips.
@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 # Import disease database
 try:
     from disease_information_db import DISEASE_DATABASE, get_disease_info, get_healthy_plant_info
-    logger.info("✅ Disease information database loaded successfully")
+    logger.info("[SUCCESS] Disease information database loaded successfully")
     DATABASE_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"⚠️ Could not import disease database: {e}. Using LLM only.")
+    logger.warning(f"[WARN]️ Could not import disease database: {e}. Using LLM only.")
     DATABASE_AVAILABLE = False
 
 # ============================================================================
@@ -109,12 +109,12 @@ def initialize_groq():
     if GROQ_API_KEY:
         try:
             groq_client = Groq(api_key=GROQ_API_KEY)
-            logger.info("✅ Groq client initialized successfully")
+            logger.info("[SUCCESS] Groq client initialized successfully")
         except Exception as e:
-            logger.warning(f"⚠️  Failed to initialize Groq: {e}")
+            logger.warning(f"[WARN]️  Failed to initialize Groq: {e}")
             groq_client = None
     else:
-        logger.warning("⚠️  GROQ_API_KEY not set. Using fallback remedies.")
+        logger.warning("[WARN]️  GROQ_API_KEY not set. Using fallback remedies.")
         groq_client = None
 
 def generate_remedy_with_groq(crop: str, disease: str, is_healthy: bool) -> Optional[Dict[str, str]]:
@@ -177,7 +177,7 @@ Action: [practical steps to take]"""
         )
         
         response_text = message.content[0].text
-        logger.info(f"✅ Generated remedy for {crop} - {disease}")
+        logger.info(f"[SUCCESS] Generated remedy for {crop} - {disease}")
         
         # Parse response
         remedy = parse_groq_response(response_text)
@@ -259,7 +259,7 @@ async def generate_disease_remedy(request: DiseaseRemedyRequest) -> RemedyRespon
         # ================================================================
         
         if is_healthy or disease.lower() == 'healthy':
-            logger.info("✅ Plant is healthy - returning maintenance info from database")
+            logger.info("[SUCCESS] Plant is healthy - returning maintenance info from database")
             healthy_info = get_healthy_plant_info()
             return RemedyResponse(
                 remedy=healthy_info.get('remedy', ''),
@@ -277,7 +277,7 @@ async def generate_disease_remedy(request: DiseaseRemedyRequest) -> RemedyRespon
             
             # Check if we got actual database info (not generic fallback)
             if disease_key in DISEASE_DATABASE:
-                logger.info(f"✅ Found detailed info in database for {disease_key}")
+                logger.info(f"[SUCCESS] Found detailed info in database for {disease_key}")
                 return RemedyResponse(
                     remedy=disease_info.get('remedy', ''),
                     pesticide=disease_info.get('pesticide', ''),
@@ -294,7 +294,7 @@ async def generate_disease_remedy(request: DiseaseRemedyRequest) -> RemedyRespon
         ai_remedy = generate_remedy_with_groq(crop, disease, is_healthy)
         
         if ai_remedy and all(k in ai_remedy for k in ['remedy', 'pesticide', 'action']):
-            logger.info(f"✅ Generated detailed remedy using Groq LLM")
+            logger.info(f"[SUCCESS] Generated detailed remedy using Groq LLM")
             return RemedyResponse(
                 remedy=ai_remedy.get('remedy', ''),
                 pesticide=ai_remedy.get('pesticide', ''),
@@ -307,7 +307,7 @@ async def generate_disease_remedy(request: DiseaseRemedyRequest) -> RemedyRespon
         # STEP 3: Fall back to static remedies
         # ================================================================
         
-        logger.info(f"⚠️ Database and LLM unsuccessful, using fallback remedies")
+        logger.info(f"[WARN]️ Database and LLM unsuccessful, using fallback remedies")
         fallback_key = disease.title() if not is_healthy else 'Healthy'
         fallback = FALLBACK_REMEDIES.get(fallback_key, FALLBACK_REMEDIES.get('Healthy'))
         
@@ -357,4 +357,4 @@ async def startup_event():
     """
     logger.info("🌿 Initializing Disease Remedy Generation Service...")
     initialize_groq()
-    logger.info("✅ Disease Remedy Generation Service initialized")
+    logger.info("[SUCCESS] Disease Remedy Generation Service initialized")

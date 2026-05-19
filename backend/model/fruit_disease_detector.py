@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection - Production Inference (Clean Model) - CORRECTED
 ========================================================================
 Fast, lightweight inference for the newly trained EfficientNet-B0 model
@@ -107,11 +107,11 @@ class FruitDiseaseDetector:
         self._load_model()
         
         # CRITICAL: Log initialization for verification
-        logger.info("✅ FruitDiseaseDetector initialized successfully")
-        logger.info(f"✅ Loaded {len(self.labels)} disease labels from {self.labels_path}")
-        logger.info(f"✅ Valid fruits: {sorted(self.VALID_FRUITS)}")
-        logger.info(f"✅ Treatment database contains {len(self.TREATMENT_DATABASE)} entries")
-        logger.info("✅ ALL predictions will use ONLY these trained labels - NO external diseases")
+        logger.info("[SUCCESS] FruitDiseaseDetector initialized successfully")
+        logger.info(f"[SUCCESS] Loaded {len(self.labels)} disease labels from {self.labels_path}")
+        logger.info(f"[SUCCESS] Valid fruits: {sorted(self.VALID_FRUITS)}")
+        logger.info(f"[SUCCESS] Treatment database contains {len(self.TREATMENT_DATABASE)} entries")
+        logger.info("[SUCCESS] ALL predictions will use ONLY these trained labels - NO external diseases")
     
     def _load_labels(self):
         """
@@ -137,8 +137,8 @@ class FruitDiseaseDetector:
                 if fruit not in self.VALID_FRUITS:
                     logger.warning(f"Unknown fruit in label: {fruit} (from {label})")
             
-            logger.info(f"✓ Loaded and validated {len(self.labels)} class labels")
-            logger.info(f"✓ All predictions will use ONLY these {len(self.labels)} labels")
+            logger.info(f"[OK] Loaded and validated {len(self.labels)} class labels")
+            logger.info(f"[OK] All predictions will use ONLY these {len(self.labels)} labels")
             
         except Exception as e:
             logger.error(f"CRITICAL: Failed to load labels: {e}")
@@ -157,7 +157,7 @@ class FruitDiseaseDetector:
             # Load model without compilation (faster)
             self.model = load_model(self.model_path, compile=False)
             
-            logger.info("✓ Model loaded successfully")
+            logger.info("[OK] Model loaded successfully")
             logger.info(f"  Input shape: {self.model.input_shape}")
             logger.info(f"  Output shape: {self.model.output_shape}")
             
@@ -306,7 +306,7 @@ class FruitDiseaseDetector:
             
             fruit_conflict = len(fruits_in_top3) > 1
             if debug and fruit_conflict:
-                logger.warning(f"⚠️ Multiple fruits detected in top-3: {fruits_in_top3}")
+                logger.warning(f"[WARN]️ Multiple fruits detected in top-3: {fruits_in_top3}")
                 logger.warning("This may indicate unclear image or mixed fruits")
             
             # CRITICAL: Check for potential false "Healthy" predictions
@@ -459,12 +459,12 @@ class FruitDiseaseDetector:
                 severity = "High"
                 severity_code = 3
                 confidence_level = "High"
-                recommendation = f"⚠️ URGENT: {disease} detected with high confidence. Consult agricultural expert immediately for treatment. Isolate affected fruits to prevent spread."
+                recommendation = f"[WARN]️ URGENT: {disease} detected with high confidence. Consult agricultural expert immediately for treatment. Isolate affected fruits to prevent spread."
             elif confidence >= 0.70:
                 severity = "Moderate to High"
                 severity_code = 2
                 confidence_level = "Good"
-                recommendation = f"⚠️ {disease} likely detected. Recommend expert inspection and treatment planning. Monitor surrounding fruits closely."
+                recommendation = f"[WARN]️ {disease} likely detected. Recommend expert inspection and treatment planning. Monitor surrounding fruits closely."
             elif confidence >= 0.50:
                 severity = "Moderate (Uncertain)"
                 severity_code = 1
@@ -534,10 +534,10 @@ class FruitDiseaseDetector:
         
         # Generate interpretation with warnings
         if is_uncertain:
-            result["interpretation"] = f"⚠️ LOW CONFIDENCE ({confidence:.1%}) - Prediction uncertain. Please upload a clearer image or consult an expert."
+            result["interpretation"] = f"[WARN]️ LOW CONFIDENCE ({confidence:.1%}) - Prediction uncertain. Please upload a clearer image or consult an expert."
             result["action_required"] = "UPLOAD_BETTER_IMAGE"
         elif is_ambiguous_healthy:
-            result["interpretation"] = f"⚠️ AMBIGUOUS: Predicted as {result['prediction']} but {result['potential_disease']} is also possible. Recommend expert verification."
+            result["interpretation"] = f"[WARN]️ AMBIGUOUS: Predicted as {result['prediction']} but {result['potential_disease']} is also possible. Recommend expert verification."
             result["action_required"] = "EXPERT_VERIFICATION"
         elif "Healthy" in result["prediction"] and has_potential_diseases:
             diseases_str = ", ".join(result["potential_diseases"][:2])
@@ -612,5 +612,5 @@ if __name__ == '__main__':
     # Test if model loads correctly
     print("Testing Fruit Disease Detector...")
     detector = FruitDiseaseDetector()
-    print(f"✓ Model loaded with {len(detector.labels)} classes")
-    print(f"✓ Ready for inference")
+    print(f"[OK] Model loaded with {len(detector.labels)} classes")
+    print(f"[OK] Ready for inference")

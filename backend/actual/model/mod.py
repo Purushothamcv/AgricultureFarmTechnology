@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -51,7 +51,7 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
-print("\n✅ Classification Report:")
+print("\n[SUCCESS] Classification Report:")
 print(classification_report(y_test, y_pred, target_names=le_risk.classes_))
 print(f"\n🎯 Accuracy: {accuracy * 100:.2f}%")
 

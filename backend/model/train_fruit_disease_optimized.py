@@ -1,4 +1,4 @@
-"""
+﻿"""
 FRUIT DISEASE DETECTION MODEL - PRODUCTION-GRADE TRAINING SCRIPT
 =================================================================
 Framework: TensorFlow/Keras
@@ -8,37 +8,37 @@ Target Accuracy: 90%+
 
 OPTIMIZATIONS FOR HIGH ACCURACY
 ================================
-1. ✅ TWO-PHASE TRAINING STRATEGY
+1. [SUCCESS] TWO-PHASE TRAINING STRATEGY
    - Phase 1: Feature Extraction (frozen backbone, train head only)
    - Phase 2: Fine-Tuning (unfreeze top layers, very low LR)
 
-2. ✅ PROPER CHECKPOINT & RESUME LOGIC
+2. [SUCCESS] PROPER CHECKPOINT & RESUME LOGIC
    - Automatically detects existing checkpoints
    - Resumes from correct epoch using initial_epoch
    - Loads best model, not just last model
    - Merges history from previous training sessions
 
-3. ✅ CLASS IMBALANCE HANDLING
+3. [SUCCESS] CLASS IMBALANCE HANDLING
    - Computes class weights using sklearn
    - Applies class_weight parameter to model.fit()
    - Prevents model from ignoring minority classes
 
-4. ✅ ADVANCED DATA AUGMENTATION
+4. [SUCCESS] ADVANCED DATA AUGMENTATION
    - EfficientNet-specific preprocessing (preprocess_input)
    - Rotation, zoom, shift, flip, brightness, shear
    - Validation data: preprocessing only, no augmentation
 
-5. ✅ OPTIMIZED MODEL HEAD
+5. [SUCCESS] OPTIMIZED MODEL HEAD
    - Simplified architecture (less overfitting)
    - Global Average Pooling → Dense(256) → Dropout(0.5) → Output
    - No BatchNorm (EfficientNet already has it)
 
-6. ✅ COMPREHENSIVE CALLBACKS
+6. [SUCCESS] COMPREHENSIVE CALLBACKS
    - ModelCheckpoint: Save best model by val_accuracy
    - EarlyStopping: Restore best weights, patience=10
    - ReduceLROnPlateau: Adaptive learning rate reduction
 
-7. ✅ ADVANCED METRICS
+7. [SUCCESS] ADVANCED METRICS
    - Accuracy, Precision, Recall, Top-3 Accuracy
    - Confusion Matrix with heatmap visualization
    - Per-class accuracy breakdown
@@ -167,10 +167,10 @@ def create_data_generators():
         seed=42
     )
     
-    print(f"\n✓ Training samples: {train_generator.samples}")
-    print(f"✓ Validation samples: {validation_generator.samples}")
-    print(f"✓ Number of classes: {train_generator.num_classes}")
-    print(f"✓ Batch size: {Config.BATCH_SIZE}")
+    print(f"\n[OK] Training samples: {train_generator.samples}")
+    print(f"[OK] Validation samples: {validation_generator.samples}")
+    print(f"[OK] Number of classes: {train_generator.num_classes}")
+    print(f"[OK] Batch size: {Config.BATCH_SIZE}")
     
     # ========================================
     # VERIFY CLASS MAPPING
@@ -188,7 +188,7 @@ def create_data_generators():
     # Save labels map
     with open(Config.LABELS_PATH, 'w') as f:
         json.dump(labels_map, f, indent=4)
-    print(f"\n✓ Class labels saved to: {Config.LABELS_PATH}")
+    print(f"\n[OK] Class labels saved to: {Config.LABELS_PATH}")
     
     # ========================================
     # COMPUTE CLASS WEIGHTS (handle imbalanced dataset)
@@ -219,8 +219,8 @@ def create_data_generators():
     for idx, weight in class_weights_dict.items():
         print(f"  Class {idx:2d}: {weight:.4f}")
     print("-"*70)
-    print("✓ Minority classes get higher weights → prevents model from ignoring them")
-    print("✓ Majority classes get lower weights → prevents model from overfitting to them")
+    print("[OK] Minority classes get higher weights → prevents model from ignoring them")
+    print("[OK] Majority classes get lower weights → prevents model from overfitting to them")
     
     return train_generator, validation_generator, class_weights_dict, labels_map
 
@@ -259,7 +259,7 @@ def build_model(phase='phase1'):
     if phase == 'phase1':
         # PHASE 1: Freeze entire backbone for feature extraction
         base_model.trainable = False
-        print("✓ Base model: FROZEN (training head only)")
+        print("[OK] Base model: FROZEN (training head only)")
     else:
         # PHASE 2: Unfreeze top layers for fine-tuning
         base_model.trainable = True
@@ -270,10 +270,10 @@ def build_model(phase='phase1'):
             layer.trainable = False
         
         trainable_count = sum([1 for layer in base_model.layers if layer.trainable])
-        print(f"✓ Base model: PARTIALLY UNFROZEN")
-        print(f"✓ Total layers: {len(base_model.layers)}")
-        print(f"✓ Frozen layers: {frozen_layers}")
-        print(f"✓ Trainable layers: {trainable_count}")
+        print(f"[OK] Base model: PARTIALLY UNFROZEN")
+        print(f"[OK] Total layers: {len(base_model.layers)}")
+        print(f"[OK] Frozen layers: {frozen_layers}")
+        print(f"[OK] Trainable layers: {trainable_count}")
     
     # ========================================
     # SIMPLIFIED CLASSIFICATION HEAD
@@ -305,12 +305,12 @@ def build_model(phase='phase1'):
     total_params = model.count_params()
     trainable_params = sum([tf.size(w).numpy() for w in model.trainable_weights])
     
-    print(f"\n✓ Architecture: EfficientNet-B0 + Custom Head")
-    print(f"✓ Total parameters: {total_params:,}")
-    print(f"✓ Trainable parameters: {trainable_params:,}")
-    print(f"✓ Learning rate: {lr}")
-    print(f"✓ Optimizer: Adam")
-    print(f"✓ Loss: categorical_crossentropy")
+    print(f"\n[OK] Architecture: EfficientNet-B0 + Custom Head")
+    print(f"[OK] Total parameters: {total_params:,}")
+    print(f"[OK] Trainable parameters: {trainable_params:,}")
+    print(f"[OK] Learning rate: {lr}")
+    print(f"[OK] Optimizer: Adam")
+    print(f"[OK] Loss: categorical_crossentropy")
     
     return model
 
@@ -379,12 +379,12 @@ def load_checkpoint_and_history():
         print("\n" + "="*70)
         print("CHECKPOINT FOUND - RESUMING TRAINING")
         print("="*70)
-        print(f"✓ Loading checkpoint from: {checkpoint_path}")
+        print(f"[OK] Loading checkpoint from: {checkpoint_path}")
         
         try:
             # Load existing model
             model = keras.models.load_model(checkpoint_path)
-            print("✓ Model loaded successfully")
+            print("[OK] Model loaded successfully")
             
             # Load training history
             if os.path.exists(history_path):
@@ -395,22 +395,22 @@ def load_checkpoint_and_history():
                 best_val_acc = max(history_dict['val_accuracy'])
                 best_val_loss = min(history_dict['val_loss'])
                 
-                print(f"✓ Training history loaded")
-                print(f"✓ Previous epochs completed: {resume_epoch}")
-                print(f"✓ Best validation accuracy: {best_val_acc:.4f}")
-                print(f"✓ Best validation loss: {best_val_loss:.4f}")
+                print(f"[OK] Training history loaded")
+                print(f"[OK] Previous epochs completed: {resume_epoch}")
+                print(f"[OK] Best validation accuracy: {best_val_acc:.4f}")
+                print(f"[OK] Best validation loss: {best_val_loss:.4f}")
             else:
-                print("⚠ No history file found - starting fresh with loaded weights")
+                print("[WARN] No history file found - starting fresh with loaded weights")
                 resume_epoch = 0
             
         except Exception as e:
-            print(f"⚠ Error loading checkpoint: {e}")
-            print("✓ Starting fresh training")
+            print(f"[WARN] Error loading checkpoint: {e}")
+            print("[OK] Starting fresh training")
             model = None
             resume_epoch = 0
             history_dict = {}
     else:
-        print("\n✓ No checkpoint found - starting fresh training")
+        print("\n[OK] No checkpoint found - starting fresh training")
     
     return model, resume_epoch, history_dict
 
@@ -450,7 +450,7 @@ def save_history(history, previous_history=None):
     with open(Config.HISTORY_PATH, 'w') as f:
         json.dump(history_dict, f, indent=4)
     
-    print(f"✓ Training history saved to: {Config.HISTORY_PATH}")
+    print(f"[OK] Training history saved to: {Config.HISTORY_PATH}")
 
 
 # ========================================
@@ -516,7 +516,7 @@ def plot_training_history(history_path):
     # Save plot
     plot_path = os.path.join(Config.BASE_DIR, 'model', 'training_history.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Training plots saved to: {plot_path}")
+    print(f"[OK] Training plots saved to: {plot_path}")
     plt.close()
 
 
@@ -535,7 +535,7 @@ def evaluate_model(model, validation_generator, labels_map):
     
     # Get predictions
     validation_generator.reset()
-    print("✓ Generating predictions...")
+    print("[OK] Generating predictions...")
     y_pred_probs = model.predict(validation_generator, verbose=1)
     y_pred = np.argmax(y_pred_probs, axis=1)
     y_true = validation_generator.classes
@@ -560,12 +560,12 @@ def evaluate_model(model, validation_generator, labels_map):
         f.write(f"Model: EfficientNet-B0 Transfer Learning\n")
         f.write(f"Classes: {len(class_names)}\n\n")
         f.write(report)
-    print(f"\n✓ Classification report saved to: {report_path}")
+    print(f"\n[OK] Classification report saved to: {report_path}")
     
     # ========================================
     # CONFUSION MATRIX
     # ========================================
-    print("\n✓ Generating confusion matrix...")
+    print("\n[OK] Generating confusion matrix...")
     cm = confusion_matrix(y_true, y_pred)
     
     # Plot confusion matrix
@@ -583,7 +583,7 @@ def evaluate_model(model, validation_generator, labels_map):
     
     cm_path = os.path.join(Config.BASE_DIR, 'model', 'confusion_matrix.png')
     plt.savefig(cm_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Confusion matrix saved to: {cm_path}")
+    print(f"[OK] Confusion matrix saved to: {cm_path}")
     plt.close()
     
     # ========================================
@@ -671,13 +671,13 @@ def main():
         print("\n" + "="*70)
         print("PHASE 1: FEATURE EXTRACTION (FROZEN BACKBONE)")
         print("="*70)
-        print(f"✓ Target epochs: {phase1_target}")
-        print(f"✓ Current epoch: {resume_epoch}")
-        print(f"✓ Remaining epochs: {phase1_target - resume_epoch}")
-        print(f"✓ EfficientNet backbone: FROZEN")
-        print(f"✓ Training: Classification head only")
-        print(f"✓ Learning rate: {Config.PHASE1_LR}")
-        print(f"✓ Class weights: ENABLED")
+        print(f"[OK] Target epochs: {phase1_target}")
+        print(f"[OK] Current epoch: {resume_epoch}")
+        print(f"[OK] Remaining epochs: {phase1_target - resume_epoch}")
+        print(f"[OK] EfficientNet backbone: FROZEN")
+        print(f"[OK] Training: Classification head only")
+        print(f"[OK] Learning rate: {Config.PHASE1_LR}")
+        print(f"[OK] Class weights: ENABLED")
         print("="*70)
         
         # Build or load model
@@ -685,7 +685,7 @@ def main():
             model = build_model(phase='phase1')
         else:
             # Recompile loaded model for phase 1 settings
-            print("\n✓ Recompiling loaded model for Phase 1...")
+            print("\n[OK] Recompiling loaded model for Phase 1...")
             model.compile(
                 optimizer=keras.optimizers.Adam(learning_rate=Config.PHASE1_LR),
                 loss='categorical_crossentropy',
@@ -701,7 +701,7 @@ def main():
         callbacks = create_callbacks()
         
         # Train phase 1
-        print("\n✓ Starting Phase 1 training...")
+        print("\n[OK] Starting Phase 1 training...")
         history = model.fit(
             train_generator,
             validation_data=validation_generator,
@@ -719,15 +719,15 @@ def main():
         resume_epoch = phase1_target
         
         # Load best model from checkpoint
-        print("\n✓ Loading best model from Phase 1...")
+        print("\n[OK] Loading best model from Phase 1...")
         model = keras.models.load_model(Config.MODEL_SAVE_PATH)
         
         print("\n" + "="*70)
-        print("✓ PHASE 1 COMPLETED")
+        print("[OK] PHASE 1 COMPLETED")
         print("="*70)
     else:
         print("\n" + "="*70)
-        print("✓ PHASE 1 ALREADY COMPLETED - SKIPPING")
+        print("[OK] PHASE 1 ALREADY COMPLETED - SKIPPING")
         print("="*70)
     
     # ========================================
@@ -737,12 +737,12 @@ def main():
         print("\n" + "="*70)
         print("PHASE 2: FINE-TUNING (UNFROZEN TOP LAYERS)")
         print("="*70)
-        print(f"✓ Target epochs: {phase2_target}")
-        print(f"✓ Current epoch: {resume_epoch}")
-        print(f"✓ Remaining epochs: {phase2_target - resume_epoch}")
-        print(f"✓ Unfreezing top {Config.UNFREEZE_LAYERS} layers")
-        print(f"✓ Learning rate: {Config.PHASE2_LR}")
-        print(f"✓ Class weights: ENABLED")
+        print(f"[OK] Target epochs: {phase2_target}")
+        print(f"[OK] Current epoch: {resume_epoch}")
+        print(f"[OK] Remaining epochs: {phase2_target - resume_epoch}")
+        print(f"[OK] Unfreezing top {Config.UNFREEZE_LAYERS} layers")
+        print(f"[OK] Learning rate: {Config.PHASE2_LR}")
+        print(f"[OK] Class weights: ENABLED")
         print("="*70)
         
         # Unfreeze top layers
@@ -755,9 +755,9 @@ def main():
             layer.trainable = False
         
         trainable_count = sum([1 for layer in base_model.layers if layer.trainable])
-        print(f"\n✓ Base model total layers: {len(base_model.layers)}")
-        print(f"✓ Frozen layers: {frozen_layers}")
-        print(f"✓ Trainable layers: {trainable_count}")
+        print(f"\n[OK] Base model total layers: {len(base_model.layers)}")
+        print(f"[OK] Frozen layers: {frozen_layers}")
+        print(f"[OK] Trainable layers: {trainable_count}")
         
         # Recompile with very low learning rate
         model.compile(
@@ -771,13 +771,13 @@ def main():
             ]
         )
         
-        print(f"✓ Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
+        print(f"[OK] Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
         
         # Create callbacks
         callbacks = create_callbacks()
         
         # Train phase 2
-        print("\n✓ Starting Phase 2 training...")
+        print("\n[OK] Starting Phase 2 training...")
         
         # Load previous history for resumption
         with open(Config.HISTORY_PATH, 'r') as f:
@@ -797,21 +797,21 @@ def main():
         save_history(history, previous_history)
         
         # Load best model from checkpoint
-        print("\n✓ Loading best model from Phase 2...")
+        print("\n[OK] Loading best model from Phase 2...")
         model = keras.models.load_model(Config.MODEL_SAVE_PATH)
         
         print("\n" + "="*70)
-        print("✓ PHASE 2 COMPLETED")
+        print("[OK] PHASE 2 COMPLETED")
         print("="*70)
     else:
         print("\n" + "="*70)
-        print("✓ PHASE 2 ALREADY COMPLETED - SKIPPING")
+        print("[OK] PHASE 2 ALREADY COMPLETED - SKIPPING")
         print("="*70)
     
     # ========================================
     # EVALUATION
     # ========================================
-    print("\n✓ Starting final evaluation...")
+    print("\n[OK] Starting final evaluation...")
     evaluate_model(model, validation_generator, labels_map)
     
     # Plot training history
@@ -826,19 +826,19 @@ def main():
     print("\n" + "="*70)
     print(" "*20 + "TRAINING COMPLETED SUCCESSFULLY!")
     print("="*70)
-    print(f"\n✓ Model saved to: {Config.MODEL_SAVE_PATH}")
-    print(f"✓ Labels saved to: {Config.LABELS_PATH}")
-    print(f"✓ Training duration: {duration}")
-    print(f"✓ Total classes: 17")
-    print(f"✓ Total epochs: {phase2_target}")
+    print(f"\n[OK] Model saved to: {Config.MODEL_SAVE_PATH}")
+    print(f"[OK] Labels saved to: {Config.LABELS_PATH}")
+    print(f"[OK] Training duration: {duration}")
+    print(f"[OK] Total classes: 17")
+    print(f"[OK] Total epochs: {phase2_target}")
     print("\n" + "="*70)
     print("ACHIEVEMENTS:")
     print("="*70)
-    print("✓ Two-phase training strategy: Feature extraction → Fine-tuning")
-    print("✓ Class imbalance handled: Weighted loss function")
-    print("✓ Advanced augmentation: Better generalization")
-    print("✓ Proper checkpoint/resume: Production-grade")
-    print("✓ Comprehensive metrics: Accuracy, Precision, Recall, Top-3")
+    print("[OK] Two-phase training strategy: Feature extraction → Fine-tuning")
+    print("[OK] Class imbalance handled: Weighted loss function")
+    print("[OK] Advanced augmentation: Better generalization")
+    print("[OK] Proper checkpoint/resume: Production-grade")
+    print("[OK] Comprehensive metrics: Accuracy, Precision, Recall, Top-3")
     print("\n" + "="*70)
     print("Model is ready for deployment!")
     print("="*70 + "\n")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 RESTART TRAINING - CLEAN SLATE
 ===============================
 This script safely removes old checkpoints and starts fresh training.
@@ -35,7 +35,7 @@ def restart_training():
     # Create backup directory
     backup_dir = os.path.join(MODEL_DIR, f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
     os.makedirs(backup_dir, exist_ok=True)
-    print(f"\n✓ Created backup directory: {backup_dir}")
+    print(f"\n[OK] Created backup directory: {backup_dir}")
     
     # Backup and remove old files
     print("\n" + "-"*70)
@@ -49,19 +49,19 @@ def restart_training():
             # Backup
             backup_path = os.path.join(backup_dir, filename)
             shutil.copy2(filepath, backup_path)
-            print(f"✓ Backed up: {filename}")
+            print(f"[OK] Backed up: {filename}")
             
             # Remove
             os.remove(filepath)
-            print(f"✓ Removed: {filename}")
+            print(f"[OK] Removed: {filename}")
         else:
             print(f"⊘ Not found: {filename}")
     
     print("\n" + "="*70)
     print("CLEANUP COMPLETE")
     print("="*70)
-    print(f"✓ Old files backed up to: {backup_dir}")
-    print("✓ Training environment is clean")
+    print(f"[OK] Old files backed up to: {backup_dir}")
+    print("[OK] Training environment is clean")
     print("\nYou can now run fresh training with:")
     print("  python backend/model/train_fruit_disease_optimized.py")
     print("\nor:")
@@ -71,7 +71,7 @@ def restart_training():
 
 if __name__ == "__main__":
     # Safety confirmation
-    print("\n⚠️  WARNING: This will remove all existing checkpoints and training history!")
+    print("\n[WARN]️  WARNING: This will remove all existing checkpoints and training history!")
     print("Old files will be backed up before removal.")
     
     response = input("\nAre you sure you want to restart training? (yes/no): ")
@@ -79,4 +79,4 @@ if __name__ == "__main__":
     if response.lower() in ['yes', 'y']:
         restart_training()
     else:
-        print("\n✓ Restart cancelled. No files were modified.\n")
+        print("\n[OK] Restart cancelled. No files were modified.\n")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 FRUIT DISEASE DETECTION - FASTAPI PRODUCTION ENDPOINT
 ======================================================
 Interview-Ready | Production-Grade | RESTful API
@@ -68,7 +68,7 @@ def initialize_engine():
     try:
         logger.info("🚀 Initializing Fruit Disease Detection Engine...")
         _engine = get_inference_engine()
-        logger.info("✅ Engine initialized successfully")
+        logger.info("[SUCCESS] Engine initialized successfully")
         logger.info(f"   - Model: EfficientNet-B0")
         logger.info(f"   - Classes: {_engine.num_classes}")
         logger.info(f"   - Status: Frozen (Inference-Only)")
@@ -471,7 +471,7 @@ async def startup_event():
     """Initialize engine on FastAPI startup"""
     success = initialize_engine()
     if not success:
-        logger.error("⚠️  Fruit Disease Detection engine failed to initialize")
+        logger.error("[WARN]️  Fruit Disease Detection engine failed to initialize")
     return success
 
 

@@ -1,4 +1,4 @@
-"""
+﻿"""
 APY Dataset-Based Crop Recommendation Service
 Provides data-driven crop recommendations based on historical yield data
 """
@@ -22,7 +22,7 @@ class APYCropService:
         try:
             # Load CSV
             self.df = pd.read_csv(self.csv_path)
-            print(f"✅ Loaded APY dataset: {len(self.df)} rows")
+            print(f"[SUCCESS] Loaded APY dataset: {len(self.df)} rows")
             
             # Clean column names (remove trailing spaces)
             self.df.columns = self.df.columns.str.strip()

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection - Quick Start Script
 ============================================
 Automated workflow for dataset analysis, training, and testing
@@ -60,7 +60,7 @@ def analyze_dataset():
         stats_path = os.path.join(BASE_DIR, 'model', 'dataset_stats.json')
         analyzer.export_stats(stats_path)
         
-        print("✅ Dataset analysis completed successfully!\n")
+        print("[SUCCESS] Dataset analysis completed successfully!\n")
         return True
         
     except Exception as e:
@@ -77,7 +77,7 @@ def train_model():
         import train_fruit_disease_model
         train_fruit_disease_model.main()
         
-        print("\n✅ Model training completed successfully!\n")
+        print("\n[SUCCESS] Model training completed successfully!\n")
         return True
         
     except Exception as e:
@@ -110,7 +110,7 @@ def test_model(image_path):
             print("="*70)
             print("PREDICTION RESULTS")
             print("="*70)
-            print(f"\n✅ Predicted Class:  {result['predicted_class']}")
+            print(f"\n[SUCCESS] Predicted Class:  {result['predicted_class']}")
             print(f"🍎 Fruit Type:       {result['fruit_type']}")
             print(f"🦠 Disease:          {result['disease']}")
             print(f"📊 Confidence:       {result['confidence_percentage']}")
@@ -162,7 +162,7 @@ def run_full_workflow():
         test_model(test_img)
     
     print("\n" + "="*70)
-    print("✅ WORKFLOW COMPLETED SUCCESSFULLY!")
+    print("[SUCCESS] WORKFLOW COMPLETED SUCCESSFULLY!")
     print("="*70)
     print("\nNext steps:")
     print("1. Review generated plots and metrics")

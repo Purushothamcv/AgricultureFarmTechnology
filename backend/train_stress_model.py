@@ -1,4 +1,4 @@
-"""
+﻿"""
 Simplified Stress Level Prediction Model Training
 Uses only farmer-friendly inputs and auto-fetchable data
 
@@ -122,7 +122,7 @@ def train_stress_model():
     print("\n📊 Creating sample dataset...")
     df = create_sample_dataset(n_samples=1000)
     
-    print(f"✓ Dataset created with {len(df)} samples")
+    print(f"[OK] Dataset created with {len(df)} samples")
     print(f"\nStress Level Distribution:")
     print(df['Stress_Level'].value_counts())
     
@@ -139,15 +139,15 @@ def train_stress_model():
         le = LabelEncoder()
         X[col] = le.fit_transform(X[col])
         label_encoders[col] = le
-        print(f"  ✓ Encoded {col}: {len(le.classes_)} classes")
+        print(f"  [OK] Encoded {col}: {len(le.classes_)} classes")
     
     # Split dataset
     print("\n✂️ Splitting dataset (80% train, 20% test)...")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-    print(f"  ✓ Training samples: {len(X_train)}")
-    print(f"  ✓ Testing samples: {len(X_test)}")
+    print(f"  [OK] Training samples: {len(X_train)}")
+    print(f"  [OK] Testing samples: {len(X_test)}")
     
     # Train model
     print("\n🌲 Training Random Forest Classifier...")
@@ -161,7 +161,7 @@ def train_stress_model():
     )
     
     model.fit(X_train, y_train)
-    print("  ✓ Model trained successfully")
+    print("  [OK] Model trained successfully")
     
     # Evaluate model
     print("\n📈 Evaluating model...")
@@ -196,21 +196,21 @@ def train_stress_model():
     # Save model
     model_path = os.path.join(model_dir, 'stress_prediction_model.pkl')
     joblib.dump(model, model_path)
-    print(f"  ✓ Model saved: {model_path}")
+    print(f"  [OK] Model saved: {model_path}")
     
     # Save label encoders
     encoders_path = os.path.join(model_dir, 'stress_label_encoders.pkl')
     joblib.dump(label_encoders, encoders_path)
-    print(f"  ✓ Encoders saved: {encoders_path}")
+    print(f"  [OK] Encoders saved: {encoders_path}")
     
     # Save feature list
     feature_list = X.columns.tolist()
     features_path = os.path.join(model_dir, 'stress_features.pkl')
     joblib.dump(feature_list, features_path)
-    print(f"  ✓ Features saved: {features_path}")
+    print(f"  [OK] Features saved: {features_path}")
     
     print(f"\n{'=' * 60}")
-    print("✅ TRAINING COMPLETE!")
+    print("[SUCCESS] TRAINING COMPLETE!")
     print(f"{'=' * 60}")
     print(f"\nModel Accuracy: {accuracy * 100:.2f}%")
     print(f"F1-Score: {f1 * 100:.2f}%")

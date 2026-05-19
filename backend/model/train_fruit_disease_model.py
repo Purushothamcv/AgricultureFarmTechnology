@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection Model Training Script
 ==============================================
 Framework: TensorFlow/Keras
@@ -18,18 +18,18 @@ WHY EFFICIENTNET-B0?
 KEY IMPROVEMENTS FOR BETTER ACCURACY
 ========================================
 
-1. ✅ EFFICIENTNET-SPECIFIC PREPROCESSING
+1. [SUCCESS] EFFICIENTNET-SPECIFIC PREPROCESSING
    - Using preprocess_input() instead of simple rescale=1./255
    - Proper normalization matching ImageNet training
 
-2. ✅ CLASS IMBALANCE HANDLING
+2. [SUCCESS] CLASS IMBALANCE HANDLING
    - Computing class weights using sklearn
    - Passing class_weight to model.fit()
    - Minority classes (79 samples) get higher weights
    - Majority classes (1450 samples) get lower weights
    - Prevents model from ignoring rare diseases
 
-3. ✅ AGGRESSIVE DATA AUGMENTATION
+3. [SUCCESS] AGGRESSIVE DATA AUGMENTATION
    - Rotation: ±40° (increased from ±30°)
    - Shift: 30% (increased from 20%)
    - Zoom: 30% (increased from 20%)
@@ -37,18 +37,18 @@ KEY IMPROVEMENTS FOR BETTER ACCURACY
    - Brightness: [0.7, 1.3] (wider range)
    - Better generalization, less overfitting
 
-4. ✅ SIMPLIFIED MODEL HEAD
+4. [SUCCESS] SIMPLIFIED MODEL HEAD
    - Removed BatchNormalization (redundant with EfficientNet)
    - Removed second Dense layer (was causing overfitting)
    - Single Dense(256) + Dropout(0.5) + Output
    - Clean architecture for better generalization
 
-5. ✅ CLASS MAPPING VERIFICATION
+5. [SUCCESS] CLASS MAPPING VERIFICATION
    - Prints class_indices during training
    - Easy to verify correct label mapping
    - Helps debug potential data loading issues
 
-6. ✅ TWO-PHASE TRAINING STRATEGY
+6. [SUCCESS] TWO-PHASE TRAINING STRATEGY
    PHASE 1: Feature Extraction (30 epochs)
      - Freeze EfficientNet backbone
      - Train only custom head
@@ -61,7 +61,7 @@ KEY IMPROVEMENTS FOR BETTER ACCURACY
      - Continue with class weights
      - Gradual adaptation to fruit diseases
 
-7. ✅ ENHANCED METRICS
+7. [SUCCESS] ENHANCED METRICS
    - Accuracy, Precision, Recall
    - Top-3 Accuracy (useful for similar diseases)
    - Per-class accuracy in evaluation
@@ -152,7 +152,7 @@ def check_and_fix_dataset_structure():
     needs_fix = any(os.path.exists(os.path.join(Config.DATASET_PATH, f)) for f in fruit_folders)
     
     if needs_fix:
-        print("\n⚠️  Detected nested dataset structure. Auto-fixing...")
+        print("\n[WARN]️  Detected nested dataset structure. Auto-fixing...")
         
         for fruit in fruit_folders:
             fruit_path = os.path.join(Config.DATASET_PATH, fruit)
@@ -168,13 +168,13 @@ def check_and_fix_dataset_structure():
                 
                 if not os.path.exists(destination):
                     shutil.move(source, destination)
-                    print(f"  ✓ Moved: {disease_folder}")
+                    print(f"  [OK] Moved: {disease_folder}")
             
             # Remove empty fruit folder
             if not os.listdir(fruit_path):
                 os.rmdir(fruit_path)
         
-        print("✓ Dataset structure fixed!\n")
+        print("[OK] Dataset structure fixed!\n")
 
 
 def create_data_generators():
@@ -246,10 +246,10 @@ def create_data_generators():
         seed=42
     )
     
-    print(f"\n✓ Training samples: {train_generator.samples}")
-    print(f"✓ Validation samples: {validation_generator.samples}")
-    print(f"✓ Number of classes: {train_generator.num_classes}")
-    print(f"✓ Batch size: {Config.BATCH_SIZE}")
+    print(f"\n[OK] Training samples: {train_generator.samples}")
+    print(f"[OK] Validation samples: {validation_generator.samples}")
+    print(f"[OK] Number of classes: {train_generator.num_classes}")
+    print(f"[OK] Batch size: {Config.BATCH_SIZE}")
     
     # ========================================
     # VERIFY CLASS MAPPING (Critical for debugging)
@@ -266,7 +266,7 @@ def create_data_generators():
     
     with open(Config.LABELS_PATH, 'w') as f:
         json.dump(labels_map, f, indent=4)
-    print(f"\n✓ Class labels saved to: {Config.LABELS_PATH}")
+    print(f"\n[OK] Class labels saved to: {Config.LABELS_PATH}")
     
     # ========================================
     # COMPUTE CLASS WEIGHTS (Handle imbalanced data)
@@ -299,8 +299,8 @@ def create_data_generators():
     for idx, weight in class_weights_dict.items():
         print(f"  Class {idx:2d}: {weight:.4f}")
     print("-"*60)
-    print("✓ Classes with fewer samples will get higher weights")
-    print("✓ This helps prevent model from ignoring minority classes")
+    print("[OK] Classes with fewer samples will get higher weights")
+    print("[OK] This helps prevent model from ignoring minority classes")
     
     return train_generator, validation_generator, class_weights_dict, labels_map
 
@@ -361,18 +361,18 @@ def build_model():
                  keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_accuracy')]
     )
     
-    print("\n✓ Model architecture created successfully")
-    print(f"✓ Base model: EfficientNet-B0 (ImageNet pretrained)")
-    print(f"✓ Total parameters: {model.count_params():,}")
-    print(f"✓ Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
+    print("\n[OK] Model architecture created successfully")
+    print(f"[OK] Base model: EfficientNet-B0 (ImageNet pretrained)")
+    print(f"[OK] Total parameters: {model.count_params():,}")
+    print(f"[OK] Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
     print("\n" + "-"*60)
     print("ARCHITECTURE IMPROVEMENTS:")
     print("-"*60)
-    print("✓ Using EfficientNet preprocessing (not just rescale)")
-    print("✓ Simplified head (less overfitting)")
-    print("✓ L2 regularization")
-    print("✓ Higher dropout (0.5)")
-    print("✓ Top-3 accuracy metric added")
+    print("[OK] Using EfficientNet preprocessing (not just rescale)")
+    print("[OK] Simplified head (less overfitting)")
+    print("[OK] L2 regularization")
+    print("[OK] Higher dropout (0.5)")
+    print("[OK] Top-3 accuracy metric added")
     
     return model
 
@@ -467,7 +467,7 @@ def plot_training_history(history):
     plt.tight_layout()
     plot_path = os.path.join(Config.BASE_DIR, 'model', 'training_history.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Training plots saved to: {plot_path}")
+    print(f"[OK] Training plots saved to: {plot_path}")
     plt.close()
 
 
@@ -504,7 +504,7 @@ def evaluate_model(model, validation_generator, labels_map):
         f.write("FRUIT DISEASE DETECTION - CLASSIFICATION REPORT\n")
         f.write("="*60 + "\n\n")
         f.write(report)
-    print(f"\n✓ Classification report saved to: {report_path}")
+    print(f"\n[OK] Classification report saved to: {report_path}")
     
     # Confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -523,7 +523,7 @@ def evaluate_model(model, validation_generator, labels_map):
     
     cm_path = os.path.join(Config.BASE_DIR, 'model', 'confusion_matrix.png')
     plt.savefig(cm_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Confusion matrix saved to: {cm_path}")
+    print(f"[OK] Confusion matrix saved to: {cm_path}")
     plt.close()
     
     # Per-class accuracy
@@ -571,15 +571,15 @@ def fine_tune_model(model, train_generator, validation_generator, class_weights_
     # ========================================
     # Freeze all layers except the last 30 (increased from 20)
     # ========================================
-    print(f"\n✓ Base model total layers: {len(base_model.layers)}")
+    print(f"\n[OK] Base model total layers: {len(base_model.layers)}")
     frozen_layers = len(base_model.layers) - 30
     
     for layer in base_model.layers[:frozen_layers]:
         layer.trainable = False
     
     trainable_count = sum([1 for layer in base_model.layers if layer.trainable])
-    print(f"✓ Frozen layers: {frozen_layers}")
-    print(f"✓ Trainable layers: {trainable_count}")
+    print(f"[OK] Frozen layers: {frozen_layers}")
+    print(f"[OK] Trainable layers: {trainable_count}")
     
     # Recompile with VERY LOW learning rate (critical for fine-tuning)
     model.compile(
@@ -591,8 +591,8 @@ def fine_tune_model(model, train_generator, validation_generator, class_weights_
                  keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_accuracy')]
     )
     
-    print(f"✓ Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
-    print(f"✓ Learning rate: 1e-5 (100x lower than Phase 1)")
+    print(f"[OK] Trainable parameters: {sum([tf.size(w).numpy() for w in model.trainable_weights]):,}")
+    print(f"[OK] Learning rate: 1e-5 (100x lower than Phase 1)")
     
     # Create callbacks
     callbacks = create_callbacks()
@@ -601,7 +601,7 @@ def fine_tune_model(model, train_generator, validation_generator, class_weights_
     fine_tune_epochs = 20
     total_epochs = initial_epochs + fine_tune_epochs
     
-    print(f"\n✓ Training from epoch {initial_epochs} to {total_epochs}")
+    print(f"\n[OK] Training from epoch {initial_epochs} to {total_epochs}")
     print("="*60)
     
     history = model.fit(
@@ -666,7 +666,7 @@ def main():
         print("\n" + "="*60)
         print("CHECKPOINT FOUND - RESUMING TRAINING")
         print("="*60)
-        print(f"✓ Loading checkpoint from: {checkpoint_path}")
+        print(f"[OK] Loading checkpoint from: {checkpoint_path}")
         
         # Load existing model
         model = keras.models.load_model(checkpoint_path)
@@ -677,17 +677,17 @@ def main():
                 history_dict = json.load(f)
                 resume_epoch = len(history_dict['accuracy'])
                 best_val_acc = max(history_dict['val_accuracy'])
-                print(f"✓ Resuming from epoch {resume_epoch}")
-                print(f"✓ Previous best validation accuracy: {best_val_acc:.4f}")
+                print(f"[OK] Resuming from epoch {resume_epoch}")
+                print(f"[OK] Previous best validation accuracy: {best_val_acc:.4f}")
         else:
             # No history but model exists - assume fresh start with pretrained weights
-            print("⚠ No history file found")
-            print("✓ Using loaded weights, starting from epoch 0")
+            print("[WARN] No history file found")
+            print("[OK] Using loaded weights, starting from epoch 0")
             resume_epoch = 0
         
         print("="*60)
     else:
-        print("\n✓ No checkpoint found - starting fresh training")
+        print("\n[OK] No checkpoint found - starting fresh training")
     
     # ========================================
     # STEP 1: Create data generators WITH CLASS WEIGHTS
@@ -700,11 +700,11 @@ def main():
     if model is None:
         # No checkpoint - build new model
         model = build_model()
-        print("\n✓ Built new model from scratch")
+        print("\n[OK] Built new model from scratch")
     else:
         # Checkpoint loaded - recompile to ensure training readiness
-        print("\n✓ Using loaded model from checkpoint")
-        print("✓ Recompiling model for resumed training...")
+        print("\n[OK] Using loaded model from checkpoint")
+        print("[OK] Recompiling model for resumed training...")
         model.compile(
             optimizer=keras.optimizers.Adam(learning_rate=1e-3),
             loss='categorical_crossentropy',
@@ -732,16 +732,16 @@ def main():
         print("\n" + "="*60)
         print("PHASE 1: FROZEN BASE MODEL (FEATURE EXTRACTION)")
         print("="*60)
-        print("✓ EfficientNet backbone: FROZEN")
-        print("✓ Training: Classification head only (332K params)")
-        print("✓ Optimizer: Adam (learning_rate=1e-3)")
-        print("✓ Class weights: ENABLED (balances 79-1450 samples/class)")
-        print(f"✓ Target epochs: {initial_epochs}")
+        print("[OK] EfficientNet backbone: FROZEN")
+        print("[OK] Training: Classification head only (332K params)")
+        print("[OK] Optimizer: Adam (learning_rate=1e-3)")
+        print("[OK] Class weights: ENABLED (balances 79-1450 samples/class)")
+        print(f"[OK] Target epochs: {initial_epochs}")
         
         if resume_epoch > 0:
-            print(f"✓ RESUMING from epoch {resume_epoch}")
+            print(f"[OK] RESUMING from epoch {resume_epoch}")
         else:
-            print("✓ STARTING fresh training")
+            print("[OK] STARTING fresh training")
         
         print("="*60)
         
@@ -777,10 +777,10 @@ def main():
         
         with open(Config.HISTORY_PATH, 'w') as f:
             json.dump(history_dict, f, indent=4)
-        print(f"\n✓ Training history saved to: {Config.HISTORY_PATH}")
+        print(f"\n[OK] Training history saved to: {Config.HISTORY_PATH}")
     else:
         print("\n" + "="*60)
-        print("✓ Phase 1 already completed - skipping to Phase 2")
+        print("[OK] Phase 1 already completed - skipping to Phase 2")
         print("="*60)
     
     # ========================================
@@ -790,11 +790,11 @@ def main():
     if resume_epoch < initial_epochs:
         # Just finished Phase 1 - start Phase 2 at epoch 30
         fine_tune_start_epoch = initial_epochs
-        print("\n✓ Phase 1 completed successfully - starting Phase 2")
+        print("\n[OK] Phase 1 completed successfully - starting Phase 2")
     else:
         # Already in Phase 2 - resume from saved epoch
         fine_tune_start_epoch = resume_epoch
-        print(f"\n✓ Resuming Phase 2 from epoch {resume_epoch}")
+        print(f"\n[OK] Resuming Phase 2 from epoch {resume_epoch}")
     
     # Execute fine-tuning
     fine_tune_history = fine_tune_model(
@@ -806,7 +806,7 @@ def main():
     )
     
     # Load best model
-    print("\n✓ Loading best model from checkpoint...")
+    print("\n[OK] Loading best model from checkpoint...")
     model = keras.models.load_model(Config.MODEL_SAVE_PATH)
     
     # ========================================
@@ -821,17 +821,17 @@ def main():
     print("\n" + "="*70)
     print(" "*20 + "TRAINING COMPLETED SUCCESSFULLY!")
     print("="*70)
-    print(f"\n✓ Model saved to: {Config.MODEL_SAVE_PATH}")
-    print(f"✓ Labels saved to: {Config.LABELS_PATH}")
-    print(f"✓ Training duration: {duration}")
-    print(f"✓ Total classes: {Config.NUM_CLASSES}")
+    print(f"\n[OK] Model saved to: {Config.MODEL_SAVE_PATH}")
+    print(f"[OK] Labels saved to: {Config.LABELS_PATH}")
+    print(f"[OK] Training duration: {duration}")
+    print(f"[OK] Total classes: {Config.NUM_CLASSES}")
     print("\n" + "="*70)
     print("EXPECTED IMPROVEMENTS:")
     print("="*70)
-    print("✓ Accuracy: Should be 70-90% (up from ~18%)")
-    print("✓ Recall: Should be 0.6-0.8 (up from ~0)")
-    print("✓ Loss: Should decrease steadily")
-    print("✓ No class collapse: All classes should be learned")
+    print("[OK] Accuracy: Should be 70-90% (up from ~18%)")
+    print("[OK] Recall: Should be 0.6-0.8 (up from ~0)")
+    print("[OK] Loss: Should decrease steadily")
+    print("[OK] No class collapse: All classes should be learned")
     print("\n" + "="*70)
     print("Model is ready for deployment with FastAPI!")
     print("="*70 + "\n")

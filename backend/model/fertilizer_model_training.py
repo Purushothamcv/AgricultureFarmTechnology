@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import joblib
@@ -29,4 +29,4 @@ model.fit(X, y)
 # Save model
 joblib.dump(model, "model/fert_model.pkl")
 joblib.dump(model, "model/fertilizer_model.pkl")  # Save with both names for compatibility
-print("✅ Fertilizer model trained and saved as model/fert_model.pkl")
+print("[SUCCESS] Fertilizer model trained and saved as model/fert_model.pkl")

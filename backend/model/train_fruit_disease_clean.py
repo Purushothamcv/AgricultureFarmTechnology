@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection - Clean Training Script (RESTART FROM SCRATCH)
 =======================================================================
 Framework: TensorFlow/Keras
@@ -79,11 +79,11 @@ def setup_environment():
         try:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            print(f"✓ GPU Available: {len(gpus)} device(s)")
+            print(f"[OK] GPU Available: {len(gpus)} device(s)")
         except RuntimeError as e:
-            print(f"✗ GPU Error: {e}")
+            print(f"[FAIL] GPU Error: {e}")
     else:
-        print("⚠ Running on CPU (training will be slower)")
+        print("[WARN] Running on CPU (training will be slower)")
     
     print("=" * 70)
     print()
@@ -142,10 +142,10 @@ def create_data_generators():
         seed=42
     )
     
-    print(f"✓ Training samples: {train_generator.samples}")
-    print(f"✓ Validation samples: {val_generator.samples}")
-    print(f"✓ Number of classes: {len(train_generator.class_indices)}")
-    print(f"✓ Batch size: {config.PHASE1_BATCH_SIZE}")
+    print(f"[OK] Training samples: {train_generator.samples}")
+    print(f"[OK] Validation samples: {val_generator.samples}")
+    print(f"[OK] Number of classes: {len(train_generator.class_indices)}")
+    print(f"[OK] Batch size: {config.PHASE1_BATCH_SIZE}")
     print()
     
     # Save class labels
@@ -154,7 +154,7 @@ def create_data_generators():
     
     with open(config.LABELS_OUTPUT, 'w') as f:
         json.dump(labels, f, indent=2)
-    print(f"✓ Class labels saved to: {config.LABELS_OUTPUT}")
+    print(f"[OK] Class labels saved to: {config.LABELS_OUTPUT}")
     print()
     
     # Display class distribution
@@ -220,11 +220,11 @@ def build_model(num_classes):
     # Freeze all layers for Phase 1
     base_model.trainable = False
     
-    print(f"✓ Base model: EfficientNet-B0")
-    print(f"✓ Pretrained weights: ImageNet")
-    print(f"✓ Input shape: {config.INPUT_SHAPE}")
-    print(f"✓ Base model layers: {len(base_model.layers)}")
-    print(f"✓ Initial state: ALL LAYERS FROZEN")
+    print(f"[OK] Base model: EfficientNet-B0")
+    print(f"[OK] Pretrained weights: ImageNet")
+    print(f"[OK] Input shape: {config.INPUT_SHAPE}")
+    print(f"[OK] Base model layers: {len(base_model.layers)}")
+    print(f"[OK] Initial state: ALL LAYERS FROZEN")
     print()
     
     # Build custom classification head
@@ -237,7 +237,7 @@ def build_model(num_classes):
     
     model = models.Model(inputs, outputs, name='FruitDiseaseModel')
     
-    print("✓ Custom classification head added:")
+    print("[OK] Custom classification head added:")
     print(f"  - GlobalAveragePooling2D")
     print(f"  - Dense({config.DENSE_UNITS}, activation='relu')")
     print(f"  - Dropout({config.DROPOUT_RATE})")
@@ -277,7 +277,7 @@ def train_phase1(model, train_gen, val_gen, class_weights):
         ]
     )
     
-    print("✓ Model compiled with:")
+    print("[OK] Model compiled with:")
     print(f"  - Optimizer: Adam (lr={config.PHASE1_LR})")
     print(f"  - Loss: categorical_crossentropy")
     print(f"  - Metrics: accuracy, precision, recall, top-3 accuracy")
@@ -308,7 +308,7 @@ def train_phase1(model, train_gen, val_gen, class_weights):
         )
     ]
     
-    print("✓ Callbacks configured:")
+    print("[OK] Callbacks configured:")
     print(f"  - ModelCheckpoint (save best model based on val_accuracy)")
     print(f"  - EarlyStopping (patience={config.EARLY_STOPPING_PATIENCE})")
     print(f"  - ReduceLROnPlateau (patience={config.REDUCE_LR_PATIENCE})")
@@ -328,7 +328,7 @@ def train_phase1(model, train_gen, val_gen, class_weights):
     )
     
     print()
-    print("✓ Phase 1 Training Complete!")
+    print("[OK] Phase 1 Training Complete!")
     print("=" * 70)
     print()
     
@@ -367,9 +367,9 @@ def train_phase2(model, base_model, train_gen, val_gen, class_weights):
     trainable_count = sum([1 for layer in base_model.layers if layer.trainable])
     frozen_count = len(base_model.layers) - trainable_count
     
-    print(f"✓ Total layers in base model: {total_layers}")
-    print(f"✓ Frozen layers: {frozen_count}")
-    print(f"✓ Trainable layers: {trainable_count}")
+    print(f"[OK] Total layers in base model: {total_layers}")
+    print(f"[OK] Frozen layers: {frozen_count}")
+    print(f"[OK] Trainable layers: {trainable_count}")
     print()
     
     # Recompile with lower learning rate
@@ -384,7 +384,7 @@ def train_phase2(model, base_model, train_gen, val_gen, class_weights):
         ]
     )
     
-    print("✓ Model recompiled with:")
+    print("[OK] Model recompiled with:")
     print(f"  - Optimizer: Adam (lr={config.PHASE2_LR})")
     print(f"  - Loss: categorical_crossentropy")
     print(f"  - Metrics: accuracy, precision, recall, top-3 accuracy")
@@ -415,7 +415,7 @@ def train_phase2(model, base_model, train_gen, val_gen, class_weights):
         )
     ]
     
-    print("✓ Callbacks configured:")
+    print("[OK] Callbacks configured:")
     print(f"  - ModelCheckpoint (save to: {config.MODEL_OUTPUT})")
     print(f"  - EarlyStopping (patience={config.EARLY_STOPPING_PATIENCE})")
     print(f"  - ReduceLROnPlateau (patience={config.REDUCE_LR_PATIENCE})")
@@ -435,7 +435,7 @@ def train_phase2(model, base_model, train_gen, val_gen, class_weights):
     )
     
     print()
-    print("✓ Phase 2 Training Complete!")
+    print("[OK] Phase 2 Training Complete!")
     print("=" * 70)
     print()
     
@@ -492,7 +492,7 @@ def plot_training_history(history_phase1, history_phase2):
     
     plt.tight_layout()
     plt.savefig('training_history.png', dpi=150, bbox_inches='tight')
-    print("✓ Training plots saved to: training_history.png")
+    print("[OK] Training plots saved to: training_history.png")
     print()
 
 def evaluate_model(model, val_gen):
@@ -570,12 +570,12 @@ def main():
         json.dump(combined_history, f, indent=2)
     
     print("=" * 70)
-    print("✅ TRAINING COMPLETE!")
+    print("[SUCCESS] TRAINING COMPLETE!")
     print("=" * 70)
-    print(f"✓ Model saved to: {config.MODEL_OUTPUT}")
-    print(f"✓ Labels saved to: {config.LABELS_OUTPUT}")
-    print(f"✓ History saved to: {config.HISTORY_OUTPUT}")
-    print(f"✓ Plot saved to: training_history.png")
+    print(f"[OK] Model saved to: {config.MODEL_OUTPUT}")
+    print(f"[OK] Labels saved to: {config.LABELS_OUTPUT}")
+    print(f"[OK] History saved to: {config.HISTORY_OUTPUT}")
+    print(f"[OK] Plot saved to: training_history.png")
     print()
     print("📦 DEPLOYMENT READY:")
     print(f"  - Load model: keras.models.load_model('{config.MODEL_OUTPUT}')")

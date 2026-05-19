@@ -12,8 +12,11 @@ Key fixes:
 
 """
 
-import os
 import sys
+# FIX: Add UTF-8 encoding support for Windows environments to prevent charmap errors
+sys.stdout.reconfigure(encoding='utf-8') if hasattr(sys.stdout, 'reconfigure') else None
+
+import os
 import traceback
 from dotenv import load_dotenv
 
@@ -75,16 +78,25 @@ try:
         "https://smartagri-backend-ckcz.onrender.com",
         "http://localhost:3000",  # Local dev
         "http://localhost:5173",  # Local Vite
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
     ]
+    
+    print(f"[CORS] Allowed origins: {allowed_origins}")
+    print(f"[CORS] Credentials enabled: True")
+    print(f"[CORS] Methods: ['*']")
+    print(f"[CORS] Headers: ['*']")
     
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=True,  # IMPORTANT: Enables credentials, cookies, authorization headers
+        allow_methods=["*"],     # Allow all HTTP methods
+        allow_headers=["*"],     # Allow all headers
+        expose_headers=["*"],    # Expose all response headers
+        max_age=3600,            # Cache preflight for 1 hour
     )
-    print("[OK] CORS configured")
+    print("[OK] CORS configured - credentials and specific origins enabled")
 except Exception as e:
     print(f"[WARN] CORS configuration failed: {e}")
 
@@ -103,6 +115,40 @@ async def health_check():
         "ready": True
     }
 
+@app.get("/health/models")
+async def health_check_models():
+    """Health check for ML models"""
+    try:
+        from plant_disease_service import plant_disease_model, class_mapping
+        plant_disease_loaded = plant_disease_model is not None and len(class_mapping) > 0
+    except:
+        plant_disease_loaded = False
+    
+    # Check fertilizer
+    try:
+        from api_fertilizer import get_fertilizer_service
+        service = get_fertilizer_service()
+        fertilizer_loaded = service is not None and hasattr(service, 'model') and service.model is not None
+    except:
+        fertilizer_loaded = False
+    
+    # Check stress
+    try:
+        from api_stress import get_stress_service
+        service = get_stress_service()
+        stress_loaded = service is not None
+    except:
+        stress_loaded = False
+    
+    return {
+        "status": "ok" if plant_disease_loaded else "degraded",
+        "models": {
+            "plant_disease": plant_disease_loaded,
+            "fertilizer": fertilizer_loaded,
+            "stress": stress_loaded
+        }
+    }
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -112,7 +158,38 @@ async def root():
         "version": "1.0.0"
     }
 
-print("[OK] Critical endpoints registered (/health, /)")
+# ============================================================
+# DIRECT YIELD ENDPOINTS (No prefix, for frontend compatibility)
+# ============================================================
+@app.get("/yield/states")
+async def get_states_direct():
+    """
+    Get list of Indian states for yield prediction
+    Direct endpoint (non-prefixed) for frontend compatibility
+    """
+    try:
+        INDIA_STATES = [
+            "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+            "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+            "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+            "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+            "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+            "Uttar Pradesh", "Uttarakhand", "West Bengal"
+        ]
+        return {
+            "success": True,
+            "states": INDIA_STATES,
+            "message": "States loaded successfully"
+        }
+    except Exception as e:
+        print(f"[ERROR] /yield/states: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+print("[OK] Critical endpoints registered (/health, /, /yield/states)")
 
 # ============================================================
 # PHASE 6: OPTIONAL SERVICE IMPORTS (WITH FALLBACKS)
@@ -127,6 +204,14 @@ try:
 except Exception as e:
     print(f"[SKIP] Auth service: {e}")
 
+# Weather & Location router
+weather_location_router = None
+try:
+    from weather_location import router as weather_location_router
+    print("[OK] Weather & Location service imported")
+except Exception as e:
+    print(f"[SKIP] Weather & Location service: {e}")
+
 # Crop service
 crop_router = None
 predict_crop_func = None
@@ -137,6 +222,14 @@ try:
     print("[OK] Crop service imported")
 except Exception as e:
     print(f"[SKIP] Crop service: {e}")
+
+# Crop prediction API router
+crop_prediction_router = None
+try:
+    from api_crop_prediction import router as crop_prediction_router
+    print("[OK] Crop prediction API imported")
+except Exception as e:
+    print(f"[SKIP] Crop prediction API: {e}")
 
 # Database (for optional features only)
 connect_to_mongodb = None
@@ -235,6 +328,14 @@ if auth_router:
     app.include_router(auth_router)
     print("[OK] Auth routes registered")
 
+if weather_location_router:
+    app.include_router(weather_location_router)
+    print("[OK] Weather & Location routes registered")
+
+if crop_prediction_router:
+    app.include_router(crop_prediction_router)
+    print("[OK] Crop prediction routes registered")
+
 if fruit_disease_router:
     app.include_router(fruit_disease_router)
     print("[OK] Fruit disease routes registered")
@@ -291,12 +392,82 @@ async def catch_unhandled_exceptions(request: Request, call_next):
             content={"status": "error", "message": str(exc)}
         )
 
-print("[OK] Exception middleware registered")
+# ============================================================
+# PHASE 8b: AUTHENTICATION MIDDLEWARE - SKIP OPTIONS
+# ============================================================
+@app.middleware("http")
+async def skip_options_in_auth(request: Request, call_next):
+    """
+    Middleware to skip authentication for OPTIONS requests.
+    OPTIONS requests are used by CORS preflight and should not require JWT validation.
+    
+    IMPORTANT: When using withCredentials: true, must NOT use wildcard "*" for
+    Access-Control-Allow-Origin. Use specific origins instead.
+    """
+    if request.method == "OPTIONS":
+        # Get the requesting origin
+        origin = request.headers.get("origin", "")
+        
+        # List of allowed origins (must match CORS config)
+        allowed_origins = [
+            "https://agriculture-farm-technology.vercel.app",
+            "https://smartagri-backend-ckcz.onrender.com",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+        ]
+        
+        # Check if origin is allowed
+        allowed_origin = origin if origin in allowed_origins else allowed_origins[0]
+        
+        # Return 200 OK for CORS preflight requests with specific origin
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok"},
+            headers={
+                "Access-Control-Allow-Origin": allowed_origin,
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    
+    # For non-OPTIONS requests, continue with normal processing
+    response = await call_next(request)
+    return response
+
+print("[OK] OPTIONS request handler registered (with credentials support)")
 
 # ============================================================
 # PHASE 9: STARTUP EVENT (INITIALIZATION)
 # ============================================================
 print("\n[INIT] Configuring startup event...")
+
+def print_registered_routes():
+    """Debug function to print all registered routes"""
+    print("\n" + "="*70)
+    print("[ROUTES] All Registered API Routes:")
+    print("="*70)
+    
+    routes_list = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = list(route.methods) if hasattr(route, 'methods') else ['GET']
+            for method in methods:
+                if method != "HEAD":  # Skip HEAD methods
+                    routes_list.append(f"{method:6} {route.path}")
+        elif hasattr(route, 'path'):
+            routes_list.append(f"GET    {route.path}")
+    
+    # Sort and print
+    for route in sorted(routes_list):
+        print(f"  {route}")
+    
+    print("="*70)
+    print(f"[ROUTES] Total routes registered: {len(routes_list)}")
+    print("="*70 + "\n")
 
 @app.on_event("startup")
 async def startup_event():
@@ -307,6 +478,32 @@ async def startup_event():
     print("\n" + "="*70)
     print("[STARTUP] FastAPI application startup")
     print("="*70)
+    
+    # Print all registered routes for debugging
+    print_registered_routes()
+    
+    # Initialize Groq AI client for chatbot service
+    print("\n[STARTUP] Initializing Groq AI client...")
+    try:
+        from chatbot_service import initialize_groq_client
+        success = initialize_groq_client()
+        if success:
+            print("[OK] Groq AI client initialized successfully")
+        else:
+            print("[WARN] Groq AI client initialization returned False - GROQ_API_KEY may not be set")
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize Groq client: {e}")
+        import traceback
+        print(traceback.format_exc())
+    
+    # Initialize Plant Disease Detection Service
+    print("\n[STARTUP] Initializing ML services...")
+    try:
+        from plant_disease_service import startup_event as plant_disease_startup
+        await plant_disease_startup()
+        print("[OK] Plant disease service initialized")
+    except Exception as e:
+        print(f"[WARN] Plant disease service initialization: {e}")
     
     # Try to connect to MongoDB in background
     if connect_to_mongodb:
@@ -319,7 +516,7 @@ async def startup_event():
         except Exception as e:
             print(f"[WARN] MongoDB connection failed: {e}")
     
-    print("[STARTUP] Application ready to serve requests")
+    print("\n[STARTUP] Application ready to serve requests")
     print("="*70 + "\n")
 
 # ============================================================

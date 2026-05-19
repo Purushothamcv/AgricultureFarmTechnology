@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 
 # List of diseases
@@ -39,4 +39,4 @@ df = pd.DataFrame(data, columns=columns)
 csv_file = "low_risk_potato_disease_data.csv"
 df.to_csv(csv_file, index=False)
 
-print(f"✅ Synthetic Low Risk data saved to: {csv_file}")
+print(f"[SUCCESS] Synthetic Low Risk data saved to: {csv_file}")

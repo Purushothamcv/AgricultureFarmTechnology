@@ -1,4 +1,4 @@
-"""
+﻿"""
 Plant Leaf Disease Detection Service
 =====================================
 Production-ready service for plant disease classification using trained CNN model.
@@ -19,6 +19,7 @@ from PIL import Image
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import logging
+import traceback
 
 # LAZY LOAD: TensorFlow only when needed
 # Import happens inside load_plant_disease_model() function
@@ -376,13 +377,18 @@ async def predict_plant_disease(file: UploadFile = File(...)):
     """
     # Check if model is loaded
     if plant_disease_model is None or not class_mapping:
+        error_msg = "Plant disease model not initialized"
+        logger.error(f"[503] {error_msg}")
+        logger.error(f"     Model loaded: {plant_disease_model is not None}")
+        logger.error(f"     Classes loaded: {len(class_mapping) > 0 if class_mapping else False}")
         raise HTTPException(
             status_code=503,
-            detail="Plant disease model not initialized. Please restart the server."
+            detail=f"{error_msg}. Model: {plant_disease_model is not None}, Classes: {len(class_mapping) if class_mapping else 0}"
         )
     
     # Validate file type
     if not file.content_type or not file.content_type.startswith('image/'):
+        logger.warning(f"[400] Invalid file type: {file.content_type}")
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type: {file.content_type}. Please upload an image file (JPG, PNG)."
@@ -390,13 +396,17 @@ async def predict_plant_disease(file: UploadFile = File(...)):
     
     try:
         # Read and open image
+        logger.info(f"[INFO] Processing image: {file.filename}")
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data))
+        logger.info(f"[OK] Image loaded: {image.size}")
         
         # Preprocess image
         processed_image = preprocess_image(image)
+        logger.info(f"[OK] Image preprocessed: {processed_image.shape}")
         
         # Run prediction
+        logger.info(f"[INFO] Running prediction with {len(class_names)} classes...")
         result = predict_disease(
             model=plant_disease_model,
             image_array=processed_image,
@@ -405,7 +415,7 @@ async def predict_plant_disease(file: UploadFile = File(...)):
         )
         
         # Log prediction with cleaned names
-        logger.info(f"✅ Prediction: {result['crop']} - {result['disease']} ({result['confidence']:.2%})")
+        logger.info(f"[SUCCESS] Prediction: {result['crop']} - {result['disease']} ({result['confidence']:.2%})")
         
         # Build response in the format expected by frontend
         # The frontend expects "prediction" field in "Disease_Crop" format with raw names
@@ -429,8 +439,11 @@ async def predict_plant_disease(file: UploadFile = File(...)):
         
         return JSONResponse(content=response_data)
         
+    except HTTPException:
+        raise  # Re-raise HTTPException as-is
     except Exception as e:
-        logger.error(f"❌ Prediction error: {str(e)}")
+        logger.error(f"[500] Prediction error: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"Prediction failed: {str(e)}"
@@ -474,14 +487,29 @@ async def startup_event():
     try:
         logger.info("[INIT] Initializing Plant Disease Detection Service...")
         
+        # Check if model file exists
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
+        logger.info(f"[OK] Model file exists: {MODEL_PATH}")
+        
+        # Check if dataset exists
+        if not os.path.exists(DATASET_PATH):
+            raise FileNotFoundError(f"Dataset directory not found at: {DATASET_PATH}")
+        logger.info(f"[OK] Dataset directory exists: {DATASET_PATH}")
+        
         # Extract class names from dataset
+        logger.info("[INIT] Extracting class names from dataset...")
         class_names = extract_class_names_from_dataset(DATASET_PATH)
+        logger.info(f"[OK] Extracted {len(class_names)} disease classes")
         
         # Create class mapping
         class_mapping = create_class_mapping(class_names)
+        logger.info(f"[OK] Created class mapping with {len(class_mapping)} entries")
         
         # Load model
+        logger.info("[INIT] Loading TensorFlow model...")
         plant_disease_model = load_plant_disease_model(MODEL_PATH)
+        logger.info(f"[OK] Model loaded successfully!")
         
         # Validate model output matches number of classes
         model_classes = plant_disease_model.output_shape[-1]
@@ -494,18 +522,27 @@ async def startup_event():
                 f"This may cause prediction errors!"
             )
         
-        logger.info("[OK] Plant Disease Detection Service initialized successfully!")
+        logger.info("[OK] ✅ Plant Disease Detection Service initialized successfully!")
         logger.info(f"   Ready to detect {len(class_names)} disease classes")
+        logger.info(f"   Model input shape: {plant_disease_model.input_shape}")
+        logger.info(f"   Model output shape: {plant_disease_model.output_shape}")
         
     except FileNotFoundError as e:
-        logger.warning(f"[SKIP] Plant Disease Detection initialization skipped: {str(e)}")
-        logger.warning("   Large model file (547MB) not available - this is expected on Render.")
-        logger.warning("   Plant disease detection endpoint will return 503 Service Unavailable.")
+        logger.error(f"[ERROR] Plant Disease Detection initialization failed: {str(e)}")
+        logger.error("   Model or dataset file not found.")
+        logger.error("   Plant disease detection endpoint will return 503 Service Unavailable.")
+        plant_disease_model = None
+        class_names = []
+        class_mapping = {}
         # Don't raise - allow app to start without this feature
         
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Plant Disease Detection: {str(e)}")
+        logger.error(f"[ERROR] Failed to initialize Plant Disease Detection: {str(e)}")
+        logger.error(traceback.format_exc())
         logger.error("   Plant disease detection endpoint will not be available.")
+        plant_disease_model = None
+        class_names = []
+        class_mapping = {}
         # Don't raise - allow app to start without this feature
 
 
@@ -540,13 +577,14 @@ if __name__ == "__main__":
         print("\n" + "="*60)
         print("Plant Disease Detection Service - Test Results")
         print("="*60)
-        print(f"\n✅ Service Status: {'Ready' if plant_disease_model else 'Failed'}")
+        print(f"\n[SUCCESS] Service Status: {'Ready' if plant_disease_model else 'Failed'}")
         print(f"📊 Total Classes: {len(class_names)}")
         print(f"📁 Dataset Path: {DATASET_PATH}")
-        print(f"🤖 Model Path: {MODEL_PATH}")
+        print(f"[BOT] Model Path: {MODEL_PATH}")
         print(f"\n🏷️  Sample Classes:")
         for i, cls in enumerate(class_names[:10], 1):
             print(f"   {i}. {cls}")
         print("="*60)
     
     asyncio.run(test_service())
+

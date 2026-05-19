@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fertilizer Prediction Service
 Provides ML-based fertilizer recommendations using trained model
 """
@@ -56,7 +56,7 @@ class FertilizerPredictionService:
             with open(feature_info_path, 'r') as f:
                 self.feature_info = json.load(f)
             
-            print(f"✅ Fertilizer model loaded successfully")
+            print(f"[SUCCESS] Fertilizer model loaded successfully")
             print(f"   - Features: {len(self.feature_info['feature_columns'])}")
             print(f"   - Classes: {len(self.feature_info['fertilizer_classes'])}")
             
@@ -128,21 +128,32 @@ class FertilizerPredictionService:
         if not is_valid:
             raise ValueError(error_msg)
         
-        # Prepare feature vector
-        feature_values = []
-        
-        for original_feature in self.feature_info['original_features']:
-            # Encode categorical feature
-            value = str(inputs[original_feature])
-            encoded_value = self.encoders[original_feature].transform([value])[0]
-            feature_values.append(encoded_value)
-        
-        for numerical_feature in self.feature_info['numerical_features']:
-            # Add numerical feature as-is
-            feature_values.append(float(inputs[numerical_feature]))
-        
-        # Create feature array
-        X = np.array([feature_values])
+        # Prepare feature vector in the exact order the model was trained with
+        feature_columns = self.feature_info.get('feature_columns', [])
+        if not feature_columns:
+            # Fallback to original approach if feature_columns missing
+            feature_values = []
+            for original_feature in self.feature_info['original_features']:
+                value = str(inputs[original_feature])
+                encoded_value = self.encoders[original_feature].transform([value])[0]
+                feature_values.append(encoded_value)
+            for numerical_feature in self.feature_info['numerical_features']:
+                feature_values.append(float(inputs[numerical_feature]))
+            X = np.array([feature_values])
+        else:
+            # Build row following feature_columns (e.g. Soil_Type_encoded, Soil_pH, ...)
+            row = []
+            for col in feature_columns:
+                if col.endswith('_encoded'):
+                    orig = col.replace('_encoded', '')
+                    val = str(inputs[orig])
+                    encoded = self.encoders[orig].transform([val])[0]
+                    row.append(encoded)
+                else:
+                    # numerical feature name should match inputs key
+                    row.append(float(inputs[col]))
+            # Use DataFrame so sklearn receives feature names and ordering
+            X = pd.DataFrame([row], columns=feature_columns)
         
         # Predict
         prediction = self.model.predict(X)[0]

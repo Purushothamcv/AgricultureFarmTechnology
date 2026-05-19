@@ -1,4 +1,4 @@
-"""
+﻿"""
 START TRAINING - Fruit Disease Detection Model
 ==============================================
 Simple script to start training immediately
@@ -34,14 +34,14 @@ if not os.path.exists(dataset_path):
     print("\nPlease ensure your dataset is in backend/data/archive/")
     sys.exit(1)
 
-print(f"\n✓ Dataset found: {dataset_path}")
+print(f"\n[OK] Dataset found: {dataset_path}")
 
 # Import and run training
 try:
     print("\n📦 Loading training modules...")
     from model import train_fruit_disease_model
     
-    print("✓ Modules loaded successfully")
+    print("[OK] Modules loaded successfully")
     print("\n" + "="*70)
     print("STARTING TRAINING - This will take 1-3 hours")
     print("="*70 + "\n")
@@ -52,8 +52,8 @@ try:
     print("\n" + "="*70)
     print("🎉 TRAINING COMPLETED SUCCESSFULLY!")
     print("="*70)
-    print("\n✓ Model saved to: backend/model/fruit_disease_model.h5")
-    print("✓ Ready for deployment!")
+    print("\n[OK] Model saved to: backend/model/fruit_disease_model.h5")
+    print("[OK] Ready for deployment!")
     print("\nNext step: Start your API server")
     print("  uvicorn main_fastapi:app --reload")
     print("\n" + "="*70 + "\n")

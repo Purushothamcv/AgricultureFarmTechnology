@@ -5,7 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import axios from 'axios';
 import { AlertTriangle, MapPin, Sprout, Map } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // ============================================
 // ENVIRONMENTAL DATA FETCHING HELPERS
@@ -117,7 +117,13 @@ const StressPrediction = () => {
     lng: ''
   });
   
-  const [options, setOptions] = useState(null);
+  const [options, setOptions] = useState({
+    crop_types: [],
+    growth_stages: [],
+    stress_types: [],
+    indicators: [],
+    severity_levels: []
+  });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -125,17 +131,37 @@ const StressPrediction = () => {
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
   const [soilDataFetched, setSoilDataFetched] = useState(false);
   const [locationData, setLocationData] = useState(null);
+  const [optionsLoading, setOptionsLoading] = useState(true);
 
   // Load dropdown options on mount
   useEffect(() => {
     const loadOptions = async () => {
+      setOptionsLoading(true);
       try {
         const response = await axios.get(`${API_URL}/api/stress/options`);
-        if (response.data.success) {
-          setOptions(response.data.options);
+        if (response.data.status === 'success' || response.data.data) {
+          const data = response.data.data || response.data;
+          // Validate and set options with safe defaults
+          setOptions({
+            crop_types: Array.isArray(data.crop_types) ? data.crop_types : [],
+            growth_stages: Array.isArray(data.growth_stages) ? data.growth_stages : [],
+            stress_types: Array.isArray(data.stress_types) ? data.stress_types : [],
+            indicators: Array.isArray(data.indicators) ? data.indicators : [],
+            severity_levels: Array.isArray(data.severity_levels) ? data.severity_levels : []
+          });
         }
       } catch (error) {
         console.error('Failed to load stress options:', error);
+        // Ensure options has safe defaults even on error
+        setOptions({
+          crop_types: [],
+          growth_stages: [],
+          stress_types: [],
+          indicators: [],
+          severity_levels: []
+        });
+      } finally {
+        setOptionsLoading(false);
       }
     };
     loadOptions();
@@ -259,54 +285,142 @@ const StressPrediction = () => {
     );
   };
 
+  // Helper for safe numeric parsing
+  const safeParseFloat = (value, fieldName, defaultValue = null) => {
+    if (value === '' || value === null || value === undefined) {
+      if (defaultValue !== null) return defaultValue;
+      console.error(`⚠️ Field ${fieldName} is empty`);
+      return null;
+    }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+      console.error(`❌ Invalid number for ${fieldName}: "${value}"`);
+      return null;
+    }
+    return num;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setResult(null);
 
     try {
+      // STEP 1: Validate required fields
+      console.log('📋 Stress Form Data:', formData);
+      
+      if (!formData.crop_type) {
+        console.error('❌ Missing crop_type');
+        alert('❌ Please select a crop type');
+        setLoading(false);
+        return;
+      }
+      if (!formData.growth_stage) {
+        console.error('❌ Missing growth_stage');
+        alert('❌ Please select a growth stage');
+        setLoading(false);
+        return;
+      }
+
+      // STEP 2: Parse all numeric fields
+      const soil_moisture = safeParseFloat(formData.soil_moisture, 'soil_moisture');
+      const soil_ph = safeParseFloat(formData.soil_ph, 'soil_ph', 7.0);
+      const organic_matter = safeParseFloat(formData.organic_matter, 'organic_matter', 3.0);
+      const pest_damage = safeParseFloat(formData.pest_damage, 'pest_damage', 0);
+      const weed_coverage = safeParseFloat(formData.weed_coverage, 'weed_coverage', 0);
+      
+      // These come from location
+      const temperature = safeParseFloat(formData.temperature, 'temperature');
+      const humidity = safeParseFloat(formData.humidity, 'humidity');
+      const rainfall = safeParseFloat(formData.rainfall, 'rainfall');
+
+      // Validate core required fields
+      if (soil_moisture === null) {
+        console.error('❌ Soil moisture is required and must be a valid number');
+        alert('❌ Soil moisture is required. Please enter a valid number.');
+        setLoading(false);
+        return;
+      }
+
+      if (temperature === null || humidity === null || rainfall === null) {
+        console.warn('⚠️ Environmental data incomplete. Please select a location to auto-fill weather data.');
+        alert('⚠️ Environmental data missing. Please click "Use My Location" or "Select from Map" to fetch weather data.');
+        setLoading(false);
+        return;
+      }
+
+      // STEP 3: Build payload for /analyze endpoint
       const payload = {
-        // Manual inputs
-        crop_type: formData.crop_type,
-        growth_stage: formData.growth_stage,
-        soil_moisture: parseFloat(formData.soil_moisture),
-        soil_ph: parseFloat(formData.soil_ph),
-        organic_matter: parseFloat(formData.organic_matter),
-        pest_damage: parseFloat(formData.pest_damage),
-        weed_coverage: parseFloat(formData.weed_coverage),
-        
-        // Auto-fetch/Manual weather
-        temperature: parseFloat(formData.temperature),
-        humidity: parseFloat(formData.humidity),
-        rainfall: parseFloat(formData.rainfall),
-        wind_speed: parseFloat(formData.wind_speed),
-        elevation: parseFloat(formData.elevation),
-        water_flow: parseFloat(formData.water_flow),
-        drainage: parseFloat(formData.drainage),
-        
-        // Location
-        lat: parseFloat(formData.lat) || 20.5937,
-        lng: parseFloat(formData.lng) || 78.9629
+        crop: formData.crop_type,
+        parameters: {
+          temperature,
+          humidity,
+          soil_moisture,
+          rainfall,
+          soil_ph,
+          organic_matter,
+          pest_damage,
+          weed_coverage,
+          growth_stage: formData.growth_stage,
+          wind_speed: safeParseFloat(formData.wind_speed, 'wind_speed', 10),
+          elevation: safeParseFloat(formData.elevation, 'elevation', 500),
+          water_flow: safeParseFloat(formData.water_flow, 'water_flow', 50),
+          drainage: safeParseFloat(formData.drainage, 'drainage', 70)
+        }
       };
 
-      console.log('📤 Sending stress prediction request:', payload);
+      console.log('📤 Sending stress prediction to /analyze with payload:', JSON.stringify(payload, null, 2));
+      console.log('✅ All required fields validated:');
+      console.log(`   - crop_type: ${formData.crop_type}`);
+      console.log(`   - growth_stage: ${formData.growth_stage}`);
+      console.log(`   - soil_moisture: ${soil_moisture}%`);
+      console.log(`   - temperature: ${temperature}°C`);
+      console.log(`   - humidity: ${humidity}%`);
+      console.log(`   - rainfall: ${rainfall}mm`);
       
-      const response = await axios.post(`${API_URL}/api/stress/predict`, payload);
+      // Use /analyze endpoint instead of /predict
+      const response = await axios.post(`${API_URL}/api/stress/analyze`, payload);
       
-      if (response.data.success) {
+      console.log('📥 Received response:', response.data);
+      
+      if (response.data.status === 'success' || response.data.stress_factors !== undefined) {
         setResult(response.data);
-        console.log('📥 Received prediction:', response.data);
       } else {
         throw new Error(response.data.error || 'Prediction failed');
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert(`Prediction failed: ${err.response?.data?.error || err.message}`);
+      console.error('❌ Error:', err);
+      
+      // Extract detailed error information
+      let errorMessage = 'Failed to predict stress level. Please check all inputs.';
+      
+      if (err.response?.status === 422) {
+        console.error('🔴 Validation error (422):', err.response?.data);
+        if (err.response?.data?.detail) {
+          const detail = err.response.data.detail;
+          if (Array.isArray(detail)) {
+            errorMessage = detail.map(e => e.msg || e.type || JSON.stringify(e)).join('; ');
+          } else if (typeof detail === 'string') {
+            errorMessage = detail;
+          } else if (typeof detail === 'object') {
+            errorMessage = JSON.stringify(detail);
+          }
+        }
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      console.error(`❌ Error message: ${errorMessage}`);
+      alert(errorMessage);
     }
     setLoading(false);
   };
 
-  if (!options) {
+  if (optionsLoading || !options.crop_types || options.crop_types.length === 0) {
     return (
       <div className="page-container">
         <Navbar />
@@ -390,9 +504,9 @@ const StressPrediction = () => {
                           className="input-field"
                         >
                           <option value="">Select Crop</option>
-                          {options.crop_types.map(crop => (
+                          {options?.crop_types?.map(crop => (
                             <option key={crop} value={crop}>{crop}</option>
-                          ))}
+                          )) || null}
                         </select>
                       </div>
 
@@ -408,9 +522,9 @@ const StressPrediction = () => {
                           className="input-field"
                         >
                           <option value="">Select Stage</option>
-                          {options.growth_stages.map(stage => (
+                          {options?.growth_stages?.map(stage => (
                             <option key={stage} value={stage}>{stage}</option>
-                          ))}
+                          )) || null}
                         </select>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Yield Prediction Model Training Script
 Uses APY.csv dataset to train a robust yield prediction model
 """
@@ -38,7 +38,7 @@ class YieldModelTrainer:
         # Load dataset
         print(f"\n📁 Loading dataset from {self.csv_path}...")
         self.df = pd.read_csv(self.csv_path)
-        print(f"✅ Loaded {len(self.df):,} rows")
+        print(f"[SUCCESS] Loaded {len(self.df):,} rows")
         
         # Clean column names
         self.df.columns = self.df.columns.str.strip()
@@ -75,7 +75,7 @@ class YieldModelTrainer:
         
         # IMPORTANT: Do NOT use Production as feature (data leakage prevention)
         # Since Yield = Production / Area, using Production would leak the target
-        print(f"\n⚠️  Data Leakage Prevention:")
+        print(f"\n[WARN]️  Data Leakage Prevention:")
         print(f"  - Excluding 'Production' from features")
         print(f"  - Using only: {', '.join(self.feature_columns)}")
         
@@ -113,7 +113,7 @@ class YieldModelTrainer:
             self.df[f'{feature}_encoded'] = encoder.fit_transform(self.df[feature])
             self.encoders[feature] = encoder
         
-        print(f"✅ All categorical features encoded")
+        print(f"[SUCCESS] All categorical features encoded")
         
     def prepare_features_target(self):
         """Prepare feature matrix and target vector"""
@@ -140,7 +140,7 @@ class YieldModelTrainer:
     
     def train_model(self, X, y, use_timeseries_split=True):
         """Train XGBoost model with proper validation"""
-        print(f"\n🤖 Training Model:")
+        print(f"\n[BOT] Training Model:")
         
         if use_timeseries_split:
             print(f"  - Using TimeSeriesSplit for temporal validation")
@@ -218,7 +218,7 @@ class YieldModelTrainer:
         
         # Select best model based on R² score
         if xgb_r2 >= rf_r2:
-            print(f"\n✅ Selected: XGBoost (better R² score)")
+            print(f"\n[SUCCESS] Selected: XGBoost (better R² score)")
             self.model = xgb_model
             self.metrics = {
                 'model_type': 'XGBoost',
@@ -232,7 +232,7 @@ class YieldModelTrainer:
                 'yield_p99': float(y.quantile(0.99))
             }
         else:
-            print(f"\n✅ Selected: RandomForest (better R² score)")
+            print(f"\n[SUCCESS] Selected: RandomForest (better R² score)")
             self.model = rf_model
             self.metrics = {
                 'model_type': 'RandomForest',
@@ -259,18 +259,18 @@ class YieldModelTrainer:
         # Save model
         model_path = model_dir / "yield_prediction_model.pkl"
         joblib.dump(self.model, model_path)
-        print(f"  ✅ Model saved to: {model_path}")
+        print(f"  [SUCCESS] Model saved to: {model_path}")
         
         # Save encoders
         encoders_path = model_dir / "yield_encoders.pkl"
         joblib.dump(self.encoders, encoders_path)
-        print(f"  ✅ Encoders saved to: {encoders_path}")
+        print(f"  [SUCCESS] Encoders saved to: {encoders_path}")
         
         # Save metrics
         metrics_path = model_dir / "yield_model_metrics.json"
         with open(metrics_path, 'w') as f:
             json.dump(self.metrics, f, indent=2)
-        print(f"  ✅ Metrics saved to: {metrics_path}")
+        print(f"  [SUCCESS] Metrics saved to: {metrics_path}")
         
         # Save feature info
         feature_info = {
@@ -288,7 +288,7 @@ class YieldModelTrainer:
         feature_info_path = model_dir / "yield_feature_info.json"
         with open(feature_info_path, 'w') as f:
             json.dump(feature_info, f, indent=2)
-        print(f"  ✅ Feature info saved to: {feature_info_path}")
+        print(f"  [SUCCESS] Feature info saved to: {feature_info_path}")
         
     def run_training_pipeline(self):
         """Execute complete training pipeline"""
@@ -307,7 +307,7 @@ class YieldModelTrainer:
             print(f"  - R² Score: {self.metrics['r2_score']:.4f}")
             print(f"  - RMSE: {self.metrics['rmse']:.4f}")
             print(f"  - MAE: {self.metrics['mae']:.4f}")
-            print(f"\n✅ Model is ready for production use!")
+            print(f"\n[SUCCESS] Model is ready for production use!")
             
             return True
             
@@ -328,8 +328,9 @@ def main():
         print(f"   Model file: model/yield_prediction_model.pkl")
         print(f"   Encoders file: model/yield_encoders.pkl")
     else:
-        print(f"\n⚠️  Training failed. Please check the errors above.")
+        print(f"\n[WARN]️  Training failed. Please check the errors above.")
 
 
 if __name__ == "__main__":
     main()
+

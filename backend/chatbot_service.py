@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Chatbot Service with Groq Integration
 =========================================
 Multilingual voice-enabled chatbot for agricultural assistance.
@@ -14,6 +14,7 @@ import logging
 import os
 import json
 import sys
+import traceback
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
@@ -399,21 +400,26 @@ async def get_ai_response(
     message: str,
     language: str = "english",
     conversation_history: List[ChatMessage] = [],
-    context: Optional[str] = None
+    context: Optional[str] = None,
+    fallback_enabled: bool = True
 ) -> str:
     """
-    Get AI response from Groq
+    Get AI response from Groq with fallback support
     
     Args:
         message: User's message
         language: Response language
         conversation_history: Previous conversation
         context: Additional context
+        fallback_enabled: Whether to return fallback response on error
         
     Returns:
-        AI-generated response
+        AI-generated response or fallback response
     """
     if not groq_client:
+        logger.warning("[WARN] Groq AI client not initialized")
+        if fallback_enabled:
+            return "AI service is temporarily unavailable. Please try again in a moment."
         raise HTTPException(status_code=503, detail="Groq AI client not initialized")
     
     try:
@@ -433,9 +439,9 @@ async def get_ai_response(
         messages.append({"role": "user", "content": message})
         
         # Log request
-        logger.info(f"🤖 Sending request to Groq (language: {language})")
+        logger.info(f"[BOT] Sending request to Groq (language: {language})")
         
-        # Call Groq API
+        # Call Groq API with timeout
         chat_completion = groq_client.chat.completions.create(
             messages=messages,
             model=MODEL_NAME,
@@ -448,12 +454,16 @@ async def get_ai_response(
         # Extract response
         response = chat_completion.choices[0].message.content
         
-        logger.info(f"✅ Received response from Groq ({len(response)} chars)")
+        logger.info(f"[SUCCESS] Received response from Groq ({len(response)} chars)")
         
         return response
         
     except Exception as e:
         logger.error(f"❌ Groq API error: {str(e)}")
+        logger.error(f"[TRACEBACK]\n{traceback.format_exc()}")
+        if fallback_enabled:
+            logger.warning(f"[WARN] Returning fallback response due to Groq API error")
+            return f"I encountered a temporary issue processing your request. Please try again. (Error: {type(e).__name__})"
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
 # ============================================================================
@@ -495,8 +505,8 @@ async def new_session(request: NewSessionRequest):
         try:
             collection = get_chat_collection()
             await collection.insert_one(new_session_doc)
-            print(f"✅ Session created and inserted to MongoDB - session_id: {session_id}")
-            logger.info(f"✅ NEW SESSION CREATED - user_id: {user_id} | session_id: {session_id}")
+            print(f"[SUCCESS] Session created and inserted to MongoDB - session_id: {session_id}")
+            logger.info(f"[SUCCESS] NEW SESSION CREATED - user_id: {user_id} | session_id: {session_id}")
         except Exception as db_error:
             print(f"❌ Error inserting session to MongoDB: {str(db_error)}")
             logger.error(f"❌ MongoDB insert error: {str(db_error)}")
@@ -528,15 +538,15 @@ async def get_history(session_id: str, user_id: Optional[str] = Query(default=No
         
         session = await get_chat_session(session_id)
         if not session:
-            logger.warning(f"⚠️ Session not found - session_id: {session_id}")
+            logger.warning(f"[WARN]️ Session not found - session_id: {session_id}")
             raise HTTPException(status_code=404, detail="Chat session not found")
 
         if user_id and session.get("user_id") != user_id:
-            logger.warning(f"⚠️ Session access denied - expected user_id: {user_id} | session owner: {session.get('user_id')}")
+            logger.warning(f"[WARN]️ Session access denied - expected user_id: {user_id} | session owner: {session.get('user_id')}")
             raise HTTPException(status_code=403, detail="Session does not belong to this user")
 
         messages = normalize_stored_messages(session.get("messages", []))
-        logger.info(f"✅ HISTORY RETRIEVED - session_id: {session_id} | message count: {len(messages)}")
+        logger.info(f"[SUCCESS] HISTORY RETRIEVED - session_id: {session_id} | message count: {len(messages)}")
         
         return SessionHistoryResponse(
             user_id=session.get("user_id", ""),
@@ -566,7 +576,7 @@ async def list_user_sessions(user_id: str, limit: int = Query(default=20, ge=1, 
         summaries = [build_session_summary(session) for session in sessions]
         
         session_ids = [s.session_id for s in summaries]
-        logger.info(f"✅ SESSIONS LIST RETURNED - user_id: {user_id} | count: {len(summaries)} | session_ids: {session_ids}")
+        logger.info(f"[SUCCESS] SESSIONS LIST RETURNED - user_id: {user_id} | count: {len(summaries)} | session_ids: {session_ids}")
         
         return SessionListResponse(user_id=user_id, sessions=summaries)
     except HTTPException:
@@ -589,12 +599,19 @@ async def send_message(request: SendMessageRequest):
         
         logger.debug(f"📚 Message history length: {len(full_history)} (using last {len(context_history)} for context)")
 
-        assistant_text = await get_ai_response(
-            message=request.message,
-            language=request.language,
-            conversation_history=context_history,
-            context=request.context,
-        )
+        try:
+            assistant_text = await get_ai_response(
+                message=request.message,
+                language=request.language,
+                conversation_history=context_history,
+                context=request.context,
+                fallback_enabled=True  # Enable fallback for persistent chat
+            )
+        except Exception as groq_error:
+            logger.error(f"[ERROR] Groq API call failed: {str(groq_error)}")
+            logger.error(f"[TRACEBACK]\\n{traceback.format_exc()}")
+            # Fallback response
+            assistant_text = f"I encountered a temporary issue. Please try again. ({type(groq_error).__name__})"
 
         now = datetime.now(timezone.utc)
         await append_messages_to_session(
@@ -605,12 +622,13 @@ async def send_message(request: SendMessageRequest):
             ],
         )
         
-        logger.info(f"✅ MESSAGE STORED - session_id: {request.session_id} | response length: {len(assistant_text)}")
+        logger.info(f"[SUCCESS] MESSAGE STORED - session_id: {request.session_id} | response length: {len(assistant_text)}")
         return SendMessageResponse(response=assistant_text)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Persistent chat send error - session_id: {request.session_id} | error: {str(e)}")
+        logger.error(f"[TRACEBACK]\\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Failed to send message")
 
 @router.post("/chatbot/chat", response_model=ChatResponse)
@@ -643,13 +661,18 @@ async def chat(request: ChatRequest):
     ```
     """
     try:
-        # Get AI response
+        logger.info(f"[CHAT] Request received - message length: {len(request.message)} | language: {request.language}")
+        
+        # Get AI response with fallback enabled
         response = await get_ai_response(
             message=request.message,
             language=request.language,
             conversation_history=request.conversation_history,
-            context=request.context
+            context=request.context,
+            fallback_enabled=True  # Enable fallback for legacy chat
         )
+        
+        logger.info(f"[CHAT] Response generated - length: {len(response)}")
         
         return ChatResponse(
             response=response,
@@ -660,7 +683,12 @@ async def chat(request: ChatRequest):
         raise
     except Exception as e:
         logger.error(f"❌ Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[TRACEBACK]\\n{traceback.format_exc()}")
+        # Return fallback response instead of 500 error
+        return ChatResponse(
+            response="I encountered an issue processing your request. Please try again.",
+            language=request.language
+        )
 
 @router.get("/chat/health")
 async def health_check():
@@ -720,7 +748,7 @@ async def legacy_translate_text(text: str, from_lang: str, to_lang: str):
 async def startup_event():
     """Initialize chatbot service on startup - continues even if Groq unavailable"""
     try:
-        logger.info("🤖 Initializing AI Chatbot Service...")
+        logger.info("[BOT] Initializing AI Chatbot Service...")
         groq_initialized = initialize_groq_client()
 
         # Ensure session indexes exist for fast and scalable history lookups.
@@ -730,12 +758,12 @@ async def startup_event():
         await collection.create_index([("user_id", 1), ("updated_at", -1)])
 
         if groq_initialized:
-            logger.info("✅ AI Chatbot Service initialized successfully!")
+            logger.info("[SUCCESS] AI Chatbot Service initialized successfully!")
         else:
-            logger.warning("⚠️  Chatbot service starting without Groq API (endpoints will return error)")
+            logger.warning("[WARN]️  Chatbot service starting without Groq API (endpoints will return error)")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chatbot service: {str(e)}")
-        logger.warning("⚠️  Chatbot service will be unavailable (non-fatal error)")
+        logger.warning("[WARN]️  Chatbot service will be unavailable (non-fatal error)")
 
 # ============================================================================
 # HELPER FUNCTIONS FOR AGRICULTURAL CONTEXT
@@ -766,9 +794,10 @@ if __name__ == "__main__":
         print("\n" + "="*60)
         print("AI Chatbot Service - Test Results")
         print("="*60)
-        print(f"\n✅ Service Status: {'Ready' if groq_client else 'Failed'}")
-        print(f"🤖 Model: {MODEL_NAME}")
+        print(f"\n[SUCCESS] Service Status: {'Ready' if groq_client else 'Failed'}")
+        print(f"[BOT] Model: {MODEL_NAME}")
         print(f"🌍 Languages: English, Kannada")
         print("="*60)
     
     asyncio.run(test_chatbot())
+

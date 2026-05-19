@@ -1,4 +1,4 @@
-"""
+﻿"""
 Pre-Flight Check for Fruit Disease Detection Module
 ===================================================
 Verifies that all components are properly set up before training
@@ -32,7 +32,7 @@ def print_header(text):
 
 def print_check(name, status, message=""):
     """Print check result"""
-    symbol = f"{Colors.GREEN}✓{Colors.END}" if status else f"{Colors.RED}✗{Colors.END}"
+    symbol = f"{Colors.GREEN}[OK]{Colors.END}" if status else f"{Colors.RED}[FAIL]{Colors.END}"
     status_text = f"{Colors.GREEN}PASS{Colors.END}" if status else f"{Colors.RED}FAIL{Colors.END}"
     print(f"{symbol} {name:50s} [{status_text}]")
     if message:
@@ -218,7 +218,7 @@ def main():
     print("\n" + "="*70)
     if all_passed:
         print(f"{Colors.GREEN}{Colors.BOLD}")
-        print("✅ ALL CHECKS PASSED - READY TO TRAIN!")
+        print("[SUCCESS] ALL CHECKS PASSED - READY TO TRAIN!")
         print(Colors.END)
         print("\nNext steps:")
         print("1. Analyze dataset:  python quick_start.py --analyze")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection - Inference Module
 ==========================================
 Deployment-ready inference for FastAPI integration
@@ -76,7 +76,7 @@ class FruitDiseasePredictor:
             # Strategy 1: Direct load without compilation
             try:
                 self.model = tf.keras.models.load_model(self.model_path, compile=False)
-                logger.info("✓ Model loaded successfully (Strategy 1: Direct load)")
+                logger.info("[OK] Model loaded successfully (Strategy 1: Direct load)")
             except Exception as e1:
                 logger.warning(f"Strategy 1 failed: {str(e1)[:100]}")
                 
@@ -89,7 +89,7 @@ class FruitDiseasePredictor:
                         compile=False,
                         safe_mode=False
                     )
-                    logger.info("✓ Model loaded successfully (Strategy 2: safe_mode=False)")
+                    logger.info("[OK] Model loaded successfully (Strategy 2: safe_mode=False)")
                 except Exception as e2:
                     logger.warning(f"Strategy 2 failed: {str(e2)[:100]}")
                     
@@ -97,7 +97,7 @@ class FruitDiseasePredictor:
                     try:
                         self.model = tf.saved_model.load(self.model_path)
                         self.model = self.model.signatures['serving_default']
-                        logger.info("✓ Model loaded successfully (Strategy 3: SavedModel)")
+                        logger.info("[OK] Model loaded successfully (Strategy 3: SavedModel)")
                     except Exception as e3:
                         logger.warning(f"Strategy 3 failed: {str(e3)[:100]}")
                         
@@ -129,7 +129,7 @@ class FruitDiseasePredictor:
                             
                             # Now load weights
                             self.model.load_weights(self.model_path)
-                            logger.info("✓ Model loaded successfully (Strategy 4: Manual reconstruction)")
+                            logger.info("[OK] Model loaded successfully (Strategy 4: Manual reconstruction)")
                         except Exception as e4:
                             logger.error(f"All strategies failed. Last error: {e4}")
                             raise Exception("Could not load model with any strategy")
@@ -139,7 +139,7 @@ class FruitDiseasePredictor:
                 # If it's a SavedModel signature, wrap it
                 logger.warning("Model is not a Keras model, wrapping for inference")
             
-            logger.info("✓ Model ready for inference")
+            logger.info("[OK] Model ready for inference")
             
         except Exception as e:
             logger.error(f"Fatal error loading model: {e}")
@@ -156,7 +156,7 @@ class FruitDiseasePredictor:
             
             # Convert string keys to integers
             self.labels = {int(k): v for k, v in self.labels.items()}
-            logger.info(f"✓ Loaded {len(self.labels)} class labels")
+            logger.info(f"[OK] Loaded {len(self.labels)} class labels")
             
         except Exception as e:
             logger.error(f"Error loading labels: {e}")
@@ -413,9 +413,9 @@ if __name__ == "__main__":
     # Initialize predictor
     try:
         predictor = FruitDiseasePredictor()
-        print("\n✓ Predictor initialized successfully")
-        print(f"✓ Model loaded: {predictor.model_path}")
-        print(f"✓ Number of classes: {len(predictor.labels)}")
+        print("\n[OK] Predictor initialized successfully")
+        print(f"[OK] Model loaded: {predictor.model_path}")
+        print(f"[OK] Number of classes: {len(predictor.labels)}")
         
         # Test with image if provided
         if len(sys.argv) > 1:
@@ -426,7 +426,7 @@ if __name__ == "__main__":
             result = predictor.predict_with_recommendations(test_image)
             
             if result['success']:
-                print(f"\n✅ Prediction: {result['predicted_class']}")
+                print(f"\n[SUCCESS] Prediction: {result['predicted_class']}")
                 print(f"🍎 Fruit Type: {result['fruit_type']}")
                 print(f"🦠 Disease: {result['disease']}")
                 print(f"📊 Confidence: {result['confidence_percentage']}")

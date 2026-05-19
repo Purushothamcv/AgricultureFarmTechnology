@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fertilizer Recommendation Model Training Script
 Uses fertilizer_recommendation.csv dataset to train a classification model
 """
@@ -38,7 +38,7 @@ class FertilizerModelTrainer:
         # Load dataset
         print(f"\n📁 Loading dataset from {self.csv_path}...")
         self.df = pd.read_csv(self.csv_path)
-        print(f"✅ Loaded {len(self.df):,} rows")
+        print(f"[SUCCESS] Loaded {len(self.df):,} rows")
         
         print(f"\n📊 Dataset Info:")
         print(f"  - Columns: {len(self.df.columns)}")
@@ -96,7 +96,7 @@ class FertilizerModelTrainer:
         self.label_encoder = LabelEncoder()
         self.df['target_encoded'] = self.label_encoder.fit_transform(self.df[self.target_column])
         
-        print(f"✅ All features encoded")
+        print(f"[SUCCESS] All features encoded")
         
     def prepare_features_target(self):
         """Prepare feature matrix and target vector"""
@@ -113,7 +113,7 @@ class FertilizerModelTrainer:
     
     def train_model(self, X, y):
         """Train Random Forest classification model"""
-        print(f"\n🤖 Training Model:")
+        print(f"\n[BOT] Training Model:")
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -184,23 +184,23 @@ class FertilizerModelTrainer:
         # Save model
         model_path = model_dir / "fertilizer_model.pkl"
         joblib.dump(self.model, model_path)
-        print(f"  ✅ Model saved to: {model_path}")
+        print(f"  [SUCCESS] Model saved to: {model_path}")
         
         # Save feature encoders
         encoders_path = model_dir / "fertilizer_encoders.pkl"
         joblib.dump(self.encoders, encoders_path)
-        print(f"  ✅ Feature encoders saved: {encoders_path}")
+        print(f"  [SUCCESS] Feature encoders saved: {encoders_path}")
         
         # Save label encoder
         label_encoder_path = model_dir / "fertilizer_label_encoder.pkl"
         joblib.dump(self.label_encoder, label_encoder_path)
-        print(f"  ✅ Label encoder saved: {label_encoder_path}")
+        print(f"  [SUCCESS] Label encoder saved: {label_encoder_path}")
         
         # Save metrics
         metrics_path = model_dir / "fertilizer_model_metrics.json"
         with open(metrics_path, 'w') as f:
             json.dump(self.metrics, f, indent=2)
-        print(f"  ✅ Metrics saved: {metrics_path}")
+        print(f"  [SUCCESS] Metrics saved: {metrics_path}")
         
         # Save feature info
         feature_info = {
@@ -213,7 +213,7 @@ class FertilizerModelTrainer:
         feature_info_path = model_dir / "fertilizer_feature_info.json"
         with open(feature_info_path, 'w') as f:
             json.dump(feature_info, f, indent=2)
-        print(f"  ✅ Feature info saved: {feature_info_path}")
+        print(f"  [SUCCESS] Feature info saved: {feature_info_path}")
         
     def run_training_pipeline(self):
         """Execute complete training pipeline"""
@@ -232,7 +232,7 @@ class FertilizerModelTrainer:
             print(f"  - Accuracy: {self.metrics['accuracy']:.4f} ({self.metrics['accuracy'] * 100:.2f}%)")
             print(f"  - F1-Score: {self.metrics['f1_score']:.4f}")
             print(f"  - Classes: {self.metrics['n_classes']} fertilizer types")
-            print(f"\n✅ Model is ready for production use!")
+            print(f"\n[SUCCESS] Model is ready for production use!")
             
             return True
             
@@ -253,8 +253,9 @@ def main():
         print(f"   Model file: model/fertilizer_model.pkl")
         print(f"   Encoders: model/fertilizer_encoders.pkl")
     else:
-        print(f"\n⚠️  Training failed. Please check the errors above.")
+        print(f"\n[WARN]️  Training failed. Please check the errors above.")
 
 
 if __name__ == "__main__":
     main()
+

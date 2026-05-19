@@ -1,4 +1,4 @@
-"""
+﻿"""
 Stress Prediction Service
 Simplified model using only farmer-friendly inputs and auto-fetchable data
 """
@@ -26,7 +26,7 @@ class StressPredictionService:
             features_path = model_dir / 'stress_features.pkl'
             
             if not model_path.exists():
-                print(f"⚠️ Stress model not found at {model_path}")
+                print(f"[WARN]️ Stress model not found at {model_path}")
                 print("Please run: python train_stress_model.py")
                 return False
                 
@@ -35,7 +35,7 @@ class StressPredictionService:
             self.features = joblib.load(features_path)
             self.model_loaded = True
             
-            print("✅ Stress prediction model loaded successfully")
+            print("[SUCCESS] Stress prediction model loaded successfully")
             return True
             
         except Exception as e:

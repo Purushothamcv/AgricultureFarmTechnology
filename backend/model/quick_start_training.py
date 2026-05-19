@@ -1,4 +1,4 @@
-"""
+﻿"""
 Quick Start - Fruit Disease CNN Training
 =========================================
 This script provides an interactive guide to restart training from scratch
@@ -98,7 +98,7 @@ def check_old_files():
     found_old = [f for f in old_files if os.path.exists(f)]
     
     if found_old:
-        print(f"⚠️  Found {len(found_old)} old training file(s):")
+        print(f"[WARN]️  Found {len(found_old)} old training file(s):")
         for f in found_old:
             file_size = os.path.getsize(f) / (1024 * 1024)  # MB
             print(f"   • {f} ({file_size:.1f} MB)")
@@ -108,15 +108,15 @@ def check_old_files():
             for f in found_old:
                 try:
                     os.remove(f)
-                    print(f"   ✓ Removed: {f}")
+                    print(f"   [OK] Removed: {f}")
                 except Exception as e:
-                    print(f"   ✗ Error removing {f}: {e}")
+                    print(f"   [FAIL] Error removing {f}: {e}")
             print()
         else:
             print("   ℹ Files will be overwritten during training")
             print()
     else:
-        print("✓ No old training files found (clean start)")
+        print("[OK] No old training files found (clean start)")
         print()
 
 def start_training():
@@ -125,7 +125,7 @@ def start_training():
     print()
     print("🚀 Ready to start training!")
     print()
-    print("⚠️  IMPORTANT:")
+    print("[WARN]️  IMPORTANT:")
     print("   • Do NOT interrupt training once started")
     print("   • Keep your computer powered on")
     print("   • Close unnecessary applications")
@@ -152,7 +152,7 @@ def start_training():
         print(f"\n❌ Training failed with error code: {e.returncode}")
         return False
     except KeyboardInterrupt:
-        print("\n\n⚠️  Training interrupted by user")
+        print("\n\n[WARN]️  Training interrupted by user")
         return False
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
@@ -194,7 +194,7 @@ def main():
     print()
     
     if not confirm("Run pre-training verification?"):
-        print("\n⚠️  Skipping verification (not recommended)")
+        print("\n[WARN]️  Skipping verification (not recommended)")
         print()
     else:
         run_verification()
@@ -219,7 +219,7 @@ def main():
     # Show results
     if success:
         print("\n" + "=" * 70)
-        print("✅ TRAINING COMPLETED SUCCESSFULLY!")
+        print("[SUCCESS] TRAINING COMPLETED SUCCESSFULLY!")
         print("=" * 70)
         print()
         print("📦 Generated Files:")
@@ -234,9 +234,9 @@ def main():
         for filename, description in output_files:
             if os.path.exists(filename):
                 size = os.path.getsize(filename) / (1024 * 1024)  # MB
-                print(f"   ✓ {filename:30s} ({size:6.1f} MB) - {description}")
+                print(f"   [OK] {filename:30s} ({size:6.1f} MB) - {description}")
             else:
-                print(f"   ✗ {filename:30s} - NOT FOUND")
+                print(f"   [FAIL] {filename:30s} - NOT FOUND")
         
         show_next_steps()
     else:
@@ -255,5 +255,5 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n⚠️  Setup interrupted by user")
+        print("\n\n[WARN]️  Setup interrupted by user")
         sys.exit(1)

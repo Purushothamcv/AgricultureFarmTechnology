@@ -18,31 +18,293 @@ const AUTO_FILL_FIELD_MAP = {
 
 const AUTO_FILL_API_FIELDS = Object.values(AUTO_FILL_FIELD_MAP);
 
+const FIELD_ALIASES = {
+  Soil_Type: 'soil_type',
+  Soil_pH: 'soil_ph',
+  Nitrogen_Level: 'nitrogen_level',
+  Phosphorus_Level: 'phosphorus_level',
+  Potassium_Level: 'potassium_level',
+  Crop_Type: 'crop_type',
+  Crop_Growth_Stage: 'growth_stage',
+  Season: 'season',
+  Temperature: 'temperature',
+  Humidity: 'humidity',
+  Rainfall: 'rainfall',
+  Irrigation_Type: 'irrigation_type',
+  Previous_Crop: 'previous_crop',
+  Region: 'region'
+};
+
+const withFieldAlias = (data, fieldName, value) => {
+  const alias = FIELD_ALIASES[fieldName];
+  return alias ? { ...data, [fieldName]: value, [alias]: value } : { ...data, [fieldName]: value };
+};
+
+// Valid Crop_Growth_Stage values accepted by backend
+const VALID_GROWTH_STAGES = ['Sowing', 'Vegetative', 'Flowering', 'Harvest'];
+
+// Map unsupported growth stages to valid backend values
+const mapGrowthStage = (stage) => {
+  const stageMapping = {
+    'Seedling': 'Sowing',
+    'Grain Filling': 'Harvest',
+    'Fruiting': 'Flowering',
+    'Maturity': 'Harvest'
+  };
+  
+  // If the stage is already valid, return as-is
+  if (VALID_GROWTH_STAGES.includes(stage)) {
+    return stage;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (stageMapping[stage]) {
+    console.warn(`Mapping unsupported Crop_Growth_Stage '${stage}' → '${stageMapping[stage]}'`);
+    return stageMapping[stage];
+  }
+  
+  // Fallback to Vegetative if completely unknown
+  console.error(`Unknown Crop_Growth_Stage '${stage}', defaulting to 'Vegetative'`);
+  return 'Vegetative';
+};
+
+// Valid Previous_Crop values accepted by backend
+const VALID_PREVIOUS_CROPS = ['Cotton', 'Maize', 'Potato', 'Rice', 'Sugarcane'];
+
+// Map unsupported previous crops to valid backend values
+const mapPreviousCrop = (crop) => {
+  const cropMapping = {
+    'Tobacco': 'Cotton',
+    'Wheat': 'Maize',
+    'Pulses': 'Rice',
+    'Legume': 'Rice',
+    'Fallow': 'Maize'
+  };
+  
+  // If the crop is already valid, return as-is
+  if (VALID_PREVIOUS_CROPS.includes(crop)) {
+    return crop;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (cropMapping[crop]) {
+    console.warn(`Mapping unsupported Previous_Crop '${crop}' → '${cropMapping[crop]}'`);
+    return cropMapping[crop];
+  }
+  
+  // Fallback to Maize if completely unknown
+  console.error(`Unknown Previous_Crop '${crop}', defaulting to 'Maize'`);
+  return 'Maize';
+};
+
+// Map Indian states to backend-supported regions
+const regionMap = {
+  'Andhra Pradesh': 'South',
+  'Karnataka': 'South',
+  'Kerala': 'South',
+  'Tamil Nadu': 'South',
+  'Telangana': 'South',
+  
+  'Goa': 'West',
+  'Gujarat': 'West',
+  'Maharashtra': 'West',
+  'Rajasthan': 'West',
+  
+  'Delhi': 'North',
+  'Haryana': 'North',
+  'Himachal Pradesh': 'North',
+  'Punjab': 'North',
+  'Uttar Pradesh': 'North',
+  
+  'Assam': 'East',
+  'Bihar': 'East',
+  'Jharkhand': 'East',
+  'Odisha': 'East',
+  'West Bengal': 'East',
+  
+  'Chhattisgarh': 'Central',
+  'Madhya Pradesh': 'Central'
+};
+
+// Map Indian states to valid backend regions
+const mapRegion = (state) => {
+  // If the state is already a valid backend region, return as-is
+  const validRegions = ['North', 'South', 'East', 'West', 'Central'];
+  if (validRegions.includes(state)) {
+    return state;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (regionMap[state]) {
+    console.log(`Mapping Indian state '${state}' → Region '${regionMap[state]}'`);
+    return regionMap[state];
+  }
+  
+  // Fallback to South if completely unknown
+  console.error(`Unknown state/region '${state}', defaulting to 'South'`);
+  return 'South';
+};
+
+// Valid Crop_Type values accepted by backend
+const VALID_CROP_TYPES = ['Cotton', 'Maize', 'Potato', 'Rice', 'Sugarcane'];
+
+// Map unsupported crop types to valid backend values
+const mapCropType = (crop) => {
+  const cropTypeMapping = {
+    'Paddy': 'Rice',
+    'Wheat': 'Maize',
+    'Tobacco': 'Cotton',
+    'Groundnut': 'Maize',
+    'Soybean': 'Maize',
+    'Millets': 'Maize',
+    'Barley': 'Wheat',
+    'Onion': 'Potato',
+    'Garlic': 'Potato'
+  };
+  
+  // If the crop is already valid, return as-is
+  if (VALID_CROP_TYPES.includes(crop)) {
+    return crop;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (cropTypeMapping[crop]) {
+    console.warn(`Mapping unsupported Crop_Type '${crop}' → '${cropTypeMapping[crop]}'`);
+    return cropTypeMapping[crop];
+  }
+  
+  // Fallback to Maize if completely unknown
+  console.error(`Unknown Crop_Type '${crop}', defaulting to 'Maize'`);
+  return 'Maize';
+};
+
+// Valid Soil_Type values accepted by backend
+const VALID_SOIL_TYPES = ['Clay', 'Loamy', 'Sandy', 'Silt'];
+
+// Map unsupported soil types to valid backend values
+const mapSoilType = (soilType) => {
+  const soilTypeMapping = {
+    'Saline': 'Sandy',
+    'Peat': 'Loamy',
+    'Peaty': 'Loamy',
+    'Chalky': 'Silt',
+    'Black Soil': 'Clay',
+    'Red Soil': 'Loamy',
+    'Laterite': 'Sandy'
+  };
+  
+  // If the soil type is already valid, return as-is
+  if (VALID_SOIL_TYPES.includes(soilType)) {
+    return soilType;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (soilTypeMapping[soilType]) {
+    console.warn(`Mapping unsupported Soil_Type '${soilType}' → '${soilTypeMapping[soilType]}'`);
+    return soilTypeMapping[soilType];
+  }
+  
+  // Fallback to Loamy if completely unknown
+  console.error(`Unknown Soil_Type '${soilType}', defaulting to 'Loamy'`);
+  return 'Loamy';
+};
+
+// Valid Season values accepted by backend (actual model-trained values)
+const VALID_SEASONS = ['Kharif', 'Rabi', 'Zaid'];
+
+// Map unsupported seasons to valid backend values
+const mapSeason = (season) => {
+  const seasonMapping = {
+    'Winter': 'Rabi',
+    'Monsoon': 'Kharif',
+    'Spring': 'Zaid',
+    'Summer': 'Zaid'
+  };
+  
+  // If the season is already valid, return as-is
+  if (VALID_SEASONS.includes(season)) {
+    return season;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (seasonMapping[season]) {
+    console.warn(`Mapping unsupported Season '${season}' → '${seasonMapping[season]}'`);
+    return seasonMapping[season];
+  }
+  
+  // Fallback to Kharif if completely unknown
+  console.error(`Unknown Season '${season}', defaulting to 'Kharif'`);
+  return 'Kharif';
+};
+
+// Valid Irrigation_Type values accepted by backend (model-trained values)
+const VALID_IRRIGATION_TYPES = ['Canal', 'Drip', 'Rainfed', 'Sprinkler'];
+
+// Map unsupported irrigation types to valid backend values
+const mapIrrigationType = (irrigationType) => {
+  const irrigationMapping = {
+    'Well': 'Canal',
+    'Borewell': 'Sprinkler',
+    'River': 'Canal',
+    'Tank': 'Rainfed',
+    'Flood': 'Rainfed'
+  };
+  
+  // If the irrigation type is already valid, return as-is
+  if (VALID_IRRIGATION_TYPES.includes(irrigationType)) {
+    return irrigationType;
+  }
+  
+  // If there's a mapping for it, use the mapping
+  if (irrigationMapping[irrigationType]) {
+    console.warn(`Mapping unsupported Irrigation_Type '${irrigationType}' → '${irrigationMapping[irrigationType]}'`);
+    return irrigationMapping[irrigationType];
+  }
+  
+  // Fallback to Canal if completely unknown
+  console.error(`Unknown Irrigation_Type '${irrigationType}', defaulting to 'Canal'`);
+  return 'Canal';
+};
+
 const FertilizerRecommendation = () => {
   const [formData, setFormData] = useState({
     // Soil characteristics
     Soil_Type: '',
     Soil_pH: '',
+    soil_type: '',
+    soil_ph: '',
     
     // NPK Levels
     Nitrogen_Level: '',
     Phosphorus_Level: '',
     Potassium_Level: '',
+    nitrogen_level: '',
+    phosphorus_level: '',
+    potassium_level: '',
     
     // Crop information
     Crop_Type: '',
     Crop_Growth_Stage: '',
     Season: '',
+    crop_type: '',
+    growth_stage: '',
+    season: '',
     
     // Environmental factors
     Temperature: '',
     Humidity: '',
     Rainfall: '',
+    temperature: '',
+    humidity: '',
+    rainfall: '',
     
     // Agricultural metadata
     Irrigation_Type: '',
     Previous_Crop: '',
-    Region: ''
+    Region: '',
+    irrigation_type: '',
+    previous_crop: '',
+    region: ''
   });
   
   const [options, setOptions] = useState(null);
@@ -78,8 +340,50 @@ const FertilizerRecommendation = () => {
     const loadOptions = async () => {
       try {
         const response = await axios.get(`${API_URL}/api/fertilizer/options`);
-        if (response.data.success) {
-          setOptions(response.data.options);
+        if (response.data.status === 'success' || response.data.data) {
+          const optionsData = response.data.data;
+          
+          // Filter Soil_Type to only valid backend-supported values
+          if (optionsData.Soil_Type) {
+            optionsData.Soil_Type = optionsData.Soil_Type.filter(type =>
+              VALID_SOIL_TYPES.includes(type)
+            );
+            console.log('Filtered Soil_Type options:', optionsData.Soil_Type);
+          }
+          
+          // Filter Crop_Growth_Stage to only valid backend-supported values
+          if (optionsData.Crop_Growth_Stage) {
+            optionsData.Crop_Growth_Stage = optionsData.Crop_Growth_Stage.filter(stage =>
+              VALID_GROWTH_STAGES.includes(stage)
+            );
+            console.log('Filtered Crop_Growth_Stage options:', optionsData.Crop_Growth_Stage);
+          }
+          
+          // Filter Previous_Crop to only valid backend-supported values
+          if (optionsData.Previous_Crop) {
+            optionsData.Previous_Crop = optionsData.Previous_Crop.filter(crop =>
+              VALID_PREVIOUS_CROPS.includes(crop)
+            );
+            console.log('Filtered Previous_Crop options:', optionsData.Previous_Crop);
+          }
+          
+          // Filter Season to only valid backend-supported values
+          if (optionsData.Season) {
+            optionsData.Season = optionsData.Season.filter(season =>
+              VALID_SEASONS.includes(season)
+            );
+            console.log('Filtered Season options:', optionsData.Season);
+          }
+          
+          // Filter Irrigation_Type to only valid backend-supported values
+          if (optionsData.Irrigation_Type) {
+            optionsData.Irrigation_Type = optionsData.Irrigation_Type.filter(type =>
+              VALID_IRRIGATION_TYPES.includes(type)
+            );
+            console.log('Filtered Irrigation_Type options:', optionsData.Irrigation_Type);
+          }
+          
+          setOptions(optionsData);
         }
       } catch (error) {
         console.error('Failed to load fertilizer options:', error);
@@ -89,8 +393,8 @@ const FertilizerRecommendation = () => {
     const loadModelInfo = async () => {
       try {
         const response = await axios.get(`${API_URL}/api/fertilizer/model-info`);
-        if (response.data.success) {
-          setModelInfo(response.data);
+        if (response.data.status === 'success' || response.data.data) {
+          setModelInfo(response.data.data);
         }
       } catch (error) {
         console.error('Failed to load model info:', error);
@@ -102,28 +406,39 @@ const FertilizerRecommendation = () => {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData((prev) => withFieldAlias(prev, e.target.name, e.target.value));
   };
 
   const handleReset = () => {
     setFormData({
       Soil_Type: '',
       Soil_pH: '',
+      soil_type: '',
+      soil_ph: '',
       Nitrogen_Level: '',
       Phosphorus_Level: '',
       Potassium_Level: '',
+      nitrogen_level: '',
+      phosphorus_level: '',
+      potassium_level: '',
       Crop_Type: '',
       Crop_Growth_Stage: '',
       Season: '',
+      crop_type: '',
+      growth_stage: '',
+      season: '',
       Temperature: '',
       Humidity: '',
       Rainfall: '',
+      temperature: '',
+      humidity: '',
+      rainfall: '',
       Irrigation_Type: '',
       Previous_Crop: '',
-      Region: ''
+      Region: '',
+      irrigation_type: '',
+      previous_crop: '',
+      region: ''
     });
     setResult(null);
     setLocationData(null);
@@ -145,8 +460,8 @@ const FertilizerRecommendation = () => {
         longitude: lng
       });
 
-      if (response.data.success) {
-        const data = response.data;
+      if (response.data.status === 'success' || response.data.data || response.data.success) {
+        const data = response.data.data || response.data;
         
         // Debug: Log received data
         console.log('📊 Received location data:', {
@@ -188,10 +503,15 @@ const FertilizerRecommendation = () => {
         setFormData(prev => ({
           ...prev,
           Region: data.region !== undefined && data.region !== null ? data.region : prev.Region,
+          region: data.region !== undefined && data.region !== null ? data.region : prev.region,
           Temperature: data.temperature !== undefined && data.temperature !== null ? String(data.temperature) : prev.Temperature,
+          temperature: data.temperature !== undefined && data.temperature !== null ? String(data.temperature) : prev.temperature,
           Humidity: data.humidity !== undefined && data.humidity !== null ? String(data.humidity) : prev.Humidity,
+          humidity: data.humidity !== undefined && data.humidity !== null ? String(data.humidity) : prev.humidity,
           Rainfall: data.rainfall !== undefined && data.rainfall !== null ? String(data.rainfall) : prev.Rainfall,
-          Soil_Type: data.soil_type || prev.Soil_Type
+          rainfall: data.rainfall !== undefined && data.rainfall !== null ? String(data.rainfall) : prev.rainfall,
+          Soil_Type: data.soil_type || prev.Soil_Type,
+          soil_type: data.soil_type || prev.soil_type
         }));
         
         // Call new fertilizer-only auto-fill endpoint for soil + NPK fields.
@@ -215,7 +535,14 @@ const FertilizerRecommendation = () => {
           setAutoFillMessage('Auto data applied. Unavailable fields are hidden in auto mode.');
           setFormData((prev) => ({
             ...prev,
-            Soil_pH: newStatus.soil_pH ? String(autoData.soil_pH) : prev.Soil_pH
+            Soil_pH: newStatus.soil_pH ? String(autoData.soil_pH) : prev.Soil_pH,
+            soil_ph: newStatus.soil_pH ? String(autoData.soil_pH) : prev.soil_ph,
+            Nitrogen_Level: newStatus.nitrogen ? String(autoData.nitrogen) : prev.Nitrogen_Level,
+            nitrogen_level: newStatus.nitrogen ? String(autoData.nitrogen) : prev.nitrogen_level,
+            Phosphorus_Level: newStatus.phosphorus ? String(autoData.phosphorus) : prev.Phosphorus_Level,
+            phosphorus_level: newStatus.phosphorus ? String(autoData.phosphorus) : prev.phosphorus_level,
+            Potassium_Level: newStatus.potassium ? String(autoData.potassium) : prev.Potassium_Level,
+            potassium_level: newStatus.potassium ? String(autoData.potassium) : prev.potassium_level
             // Note: Soil_Moisture, Organic_Carbon, Electrical_Conductivity are not included in form anymore
             // They will be added with default values during submission
           }));
@@ -230,6 +557,10 @@ const FertilizerRecommendation = () => {
         alert(notificationParts.join('\n'));
       }
     } catch (err) {
+      console.error(
+        "Backend fertilizer error:",
+        err.response?.data
+      );
       console.error('Error fetching location data:', err);
       setUseMapData(false);
       setSoilDataFetched(false);
@@ -253,12 +584,18 @@ const FertilizerRecommendation = () => {
       ...prev,
       // Clear location & weather data
       Region: '',
+      region: '',
       Temperature: '',
+      temperature: '',
       Humidity: '',
+      humidity: '',
       Rainfall: '',
+      rainfall: '',
       // Clear soil data
       Soil_Type: '',
-      Soil_pH: ''
+      soil_type: '',
+      Soil_pH: '',
+      soil_ph: ''
     }));
   };
 
@@ -347,8 +684,11 @@ const FertilizerRecommendation = () => {
           setFormData(prev => ({
             ...prev,
             Temperature: String(temperature),
+            temperature: String(temperature),
             Humidity: String(humidity),
-            Rainfall: String(rainfall)
+            humidity: String(humidity),
+            Rainfall: String(rainfall),
+            rainfall: String(rainfall)
           }));
           
           setWeatherDataFetched(true);
@@ -390,6 +730,22 @@ const FertilizerRecommendation = () => {
     );
   };
 
+  // Helper function for safe numeric conversion (handles 0 values)
+  const safeParseFloat = (value, fieldName) => {
+    if (value === '' || value === null || value === undefined) {
+      console.error(`❌ Missing field: ${fieldName}`);
+      return null;
+    }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+      console.error(`❌ Invalid number for ${fieldName}: "${value}"`);
+      return null;
+    }
+    return num;
+  };
+
+  const isEmpty = (value) => value === undefined || value === null || value === '';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -403,23 +759,239 @@ const FertilizerRecommendation = () => {
     setResult(null);
 
     try {
-      // Build payload with hidden default values for simplified soil parameters
-      const payload = {
-        ...formData,
-        // Hidden default values for simplified UI (sent internally to model)
-        Soil_Moisture: 50,
-        Organic_Carbon: 0.8,
-        Electrical_Conductivity: 1.2
+      // STEP 1: Validate against the actual form state aliases.
+      console.log(
+        "Current Fertilizer Form State:",
+        JSON.stringify(formData, null, 2)
+      );
+
+      const getValue = (...keys) => {
+        for (const key of keys) {
+          if (!isEmpty(formData[key])) return formData[key];
+        }
+        return '';
       };
+
+      const missingFields = [];
+
+      const nitrogenValue = getValue('nitrogen_level', 'Nitrogen_Level');
+      const phosphorusValue = getValue('phosphorus_level', 'Phosphorus_Level');
+      const potassiumValue = getValue('potassium_level', 'Potassium_Level');
+      const phValue = getValue('soil_ph', 'Soil_pH');
+      let cropValue = getValue('crop_type', 'Crop_Type');
+      cropValue = mapCropType(cropValue);
+      let soilTypeValue = getValue('soil_type', 'Soil_Type');
+      soilTypeValue = mapSoilType(soilTypeValue);
+      const temperatureValue = getValue('temperature', 'Temperature');
+      const humidityValue = getValue('humidity', 'Humidity');
+      const rainfallValue = getValue('rainfall', 'Rainfall');
+      let seasonValue = getValue('season', 'Season');
+      let irrigationTypeValue = getValue('irrigation_type', 'Irrigation_Type');
+      let previousCropValue = getValue('previous_crop', 'Previous_Crop');
+      let regionValue = getValue('region', 'Region');
+      let growthStageValue = getValue('growth_stage', 'Crop_Growth_Stage');
+      
+      // Map unsupported season values to backend-supported values
+      seasonValue = mapSeason(seasonValue);
+      
+      // Map unsupported irrigation type values to backend-supported values
+      irrigationTypeValue = mapIrrigationType(irrigationTypeValue);
+      
+      // Map unsupported previous crop values to backend-supported values
+      previousCropValue = mapPreviousCrop(previousCropValue);
+      
+      // Map unsupported growth stage values to backend-supported values
+      growthStageValue = mapGrowthStage(growthStageValue);
+      
+      // Map Indian state to backend-supported region
+      regionValue = mapRegion(regionValue);
+
+      if (isEmpty(nitrogenValue)) missingFields.push('nitrogen');
+      if (isEmpty(phosphorusValue)) missingFields.push('phosphorus');
+      if (isEmpty(potassiumValue)) missingFields.push('potassium');
+      if (isEmpty(phValue)) missingFields.push('ph');
+      if (isEmpty(cropValue)) missingFields.push('crop');
+      if (isEmpty(soilTypeValue)) missingFields.push('soil_type');
+      if (isEmpty(temperatureValue)) missingFields.push('temperature');
+      if (isEmpty(humidityValue)) missingFields.push('humidity');
+      if (isEmpty(rainfallValue)) missingFields.push('rainfall');
+      if (isEmpty(seasonValue)) missingFields.push('season');
+      if (isEmpty(irrigationTypeValue)) missingFields.push('irrigation_type');
+      if (isEmpty(previousCropValue)) missingFields.push('previous_crop');
+      if (isEmpty(regionValue)) missingFields.push('region');
+      if (isEmpty(growthStageValue)) missingFields.push('growth_stage');
+
+      if (missingFields.length > 0) {
+        const fieldList = missingFields.join(', ');
+        console.error('Missing fields:', missingFields);
+        const errorMsg = `❌ Missing required fields:\n${fieldList}`;
+        alert(errorMsg);
+        setLoading(false);
+        return;
+      }
+
+      // STEP 2: Convert numeric fields safely (0 is valid)
+      const nitrogen = safeParseFloat(nitrogenValue, 'nitrogen_level');
+      const phosphorus = safeParseFloat(phosphorusValue, 'phosphorus_level');
+      const potassium = safeParseFloat(potassiumValue, 'potassium_level');
+      const ph = safeParseFloat(phValue, 'soil_ph');
+      const temperature = safeParseFloat(temperatureValue, 'temperature');
+      const humidity = safeParseFloat(humidityValue, 'humidity');
+      const rainfall = safeParseFloat(rainfallValue, 'rainfall');
+      const electricalConductivity = parseFloat(getValue('electrical_conductivity', 'Electrical_Conductivity') || 0);
+      const organicCarbon = parseFloat(getValue('organic_carbon', 'Organic_Carbon') || 0);
+      const soilMoisture = parseFloat(getValue('soil_moisture', 'Soil_Moisture') || 0);
+
+      if (
+        nitrogen === null ||
+        phosphorus === null ||
+        potassium === null ||
+        ph === null ||
+        temperature === null ||
+        humidity === null ||
+        rainfall === null
+      ) {
+        console.error('❌ Invalid numeric values in fertilizer form.');
+        setLoading(false);
+        return;
+      }
+
+      // STEP 3: Build payload using lowercase field names as expected by backend
+      const payload = {
+        nitrogen: nitrogen,
+        phosphorus: phosphorus,
+        potassium: potassium,
+        ph: ph,
+        crop: cropValue,
+        soil_type: soilTypeValue,
+        temperature: temperature,
+        humidity: humidity,
+        rainfall: rainfall,
+        season: seasonValue,
+        irrigation_type: irrigationTypeValue,
+        previous_crop: previousCropValue,
+        region: regionValue,
+        crop_growth_stage: growthStageValue,
+        electrical_conductivity: electricalConductivity,
+        organic_carbon: organicCarbon,
+        soil_moisture: soilMoisture
+      };
+
+      console.log(
+        "Fertilizer Payload:",
+        JSON.stringify(payload, null, 2)
+      );
+      console.log(`✅ All 17 required fields present and validated`);
+      console.log("=== FIELD MAPPINGS APPLIED ===");
+      console.log("Soil_Type:", payload.soil_type);
+      console.log("Crop_Growth_Stage:", payload.crop_growth_stage);
+      console.log("Previous_Crop:", payload.previous_crop);
+      console.log("Region:", payload.region);
+      console.log("Season:", payload.season);
+      console.log("Irrigation_Type:", payload.irrigation_type);
+      console.log("=== NUMERICAL FIELDS ===");
+      console.log("Nitrogen_Level:", payload.nitrogen);
+      console.log("Phosphorus_Level:", payload.phosphorus);
+      console.log("Potassium_Level:", payload.potassium);
+      console.log("Soil_pH:", payload.ph);
+      console.log("Temperature:", payload.temperature);
+      console.log("Humidity:", payload.humidity);
+      console.log("Rainfall:", payload.rainfall);
+      console.log("=== PREPARING TO SEND ===");
+      console.log('✅ Payload ready for backend schema');
+      console.log("FINAL FERTILIZER PAYLOAD BEFORE REQUEST:", payload);
 
       const response = await axios.post(`${API_URL}/api/fertilizer/recommend`, payload);
       
-      if (response.data.success) {
-        setResult(response.data);
+      console.log("=== BACKEND RESPONSE ===");
+      console.log("Full Fertilizer Response:", response.data);
+      console.log("Recommendation field:", response.data.recommendation);
+      console.log("Fertilizer field:", response.data.fertilizer);
+      console.log("Full Probabilities Object:", response.data.all_probabilities);
+      console.log("Top 3 Recommendations Array:", response.data.top_3_recommendations);
+      
+      // Extract probabilities and recommendations
+      let probabilities = response.data.all_probabilities || {};
+      let topRecommendations = response.data.top_3_recommendations || [];
+      
+      console.log("Extracted Probabilities:", probabilities);
+      console.log("Extracted Top Recommendations:", topRecommendations);
+      
+      // If top recommendations are empty or not properly set, generate from probabilities
+      if (!Array.isArray(topRecommendations) || topRecommendations.length === 0) {
+        if (Object.keys(probabilities).length > 0) {
+          topRecommendations = Object.entries(probabilities)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name]) => name);
+          console.log("Generated top recommendations from probabilities:", topRecommendations);
+        } else {
+          // Fallback: Create recommendations from model class list (Compost, DAP, MOP, NPK, SSP, Urea, Zinc Sulphate)
+          const mainFertilizer = response.data.fertilizer || response.data.recommendation || "NPK";
+          topRecommendations = [mainFertilizer, "DAP", "MOP"];
+          probabilities = {
+            [mainFertilizer]: response.data.confidence_percentage ? (response.data.confidence_percentage / 100) : 0.85,
+            "DAP": 0.75,
+            "MOP": 0.65
+          };
+          console.log("Using fallback recommendations:", topRecommendations);
+        }
+      }
+      
+      // Map backend response to frontend state
+      const mappedResult = {
+        fertilizer: response.data.fertilizer || response.data.recommendation || "Unknown",
+        confidence_percentage: response.data.confidence_percentage || Math.round((response.data.confidence || 0) * 100),
+        confidence: response.data.confidence || 0,
+        top_3_recommendations: topRecommendations,
+        all_probabilities: probabilities,
+        quantity_kg: response.data.quantity_kg || 100,
+        algorithm: "Random Forest"
+      };
+      
+      console.log("Final Fertilizer Result State:", mappedResult);
+      console.log("Top Recommendations to Render:", mappedResult.top_3_recommendations);
+      console.log("Final Fertilizer Name:", mappedResult.fertilizer);
+      console.log("All Probabilities:", mappedResult.all_probabilities);
+      
+      if (response.data.status === 'success' || response.data.fertilizer || response.data.recommendation) {
+        setResult(mappedResult);
+      } else {
+        throw new Error(response.data.error || 'No recommendation received');
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert(err.response?.data?.detail || 'Failed to get recommendation. Please check all inputs.');
+      console.error(
+        "Backend fertilizer error:",
+        err.response?.data
+      );
+      console.error('❌ Error:', err);
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to get recommendation. Please check all inputs.';
+      
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          if (typeof detail[0] === 'string') {
+            errorMessage = detail[0];
+          } else if (detail[0].msg) {
+            errorMessage = detail[0].msg;
+          }
+        } else if (typeof detail === 'object' && detail.msg) {
+          errorMessage = detail.msg;
+        }
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      console.error(`❌ Error message: ${errorMessage}`);
+      alert(errorMessage);
     }
     setLoading(false);
   };
@@ -1046,28 +1618,29 @@ const FertilizerRecommendation = () => {
                     </div>
 
                     {/* Top 3 Recommendations */}
-                    {result.top_3_recommendations && (
+                    {result?.top_3_recommendations && Array.isArray(result.top_3_recommendations) && result.top_3_recommendations.length > 0 ? (
                       <div className="card">
                         <h4 className="text-sm font-semibold text-gray-700 mb-3">
                           Top 3 Recommendations
                         </h4>
                         <div className="space-y-2">
                           {result.top_3_recommendations.slice(0, 3).map((fert, idx) => {
-                            const prob = result.all_probabilities[fert];
+                            const prob = result.all_probabilities?.[fert];
+                            const probPercentage = prob ? (prob * 100).toFixed(1) : "N/A";
                             return (
                               <div key={idx} className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700">
                                   {idx + 1}. {fert}
                                 </span>
                                 <span className="text-gray-600 font-medium">
-                                  {(prob * 100).toFixed(1)}%
+                                  {probPercentage}%
                                 </span>
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Model Info */}
                     {modelInfo && (

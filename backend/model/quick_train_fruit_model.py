@@ -1,4 +1,4 @@
-"""
+﻿"""
 QUICK FRUIT DISEASE MODEL TRAINING
 ===================================
 Fast training script to get a working model immediately (20-30 minutes)
@@ -91,10 +91,10 @@ def create_data_generators():
     with open(Config.LABELS_PATH, 'w') as f:
         json.dump(labels_map, f, indent=4)
     
-    print(f"✓ Training samples: {train_generator.samples}")
-    print(f"✓ Validation samples: {validation_generator.samples}")
-    print(f"✓ Number of classes: {len(train_generator.class_indices)}")
-    print(f"✓ Labels saved to: {Config.LABELS_PATH}")
+    print(f"[OK] Training samples: {train_generator.samples}")
+    print(f"[OK] Validation samples: {validation_generator.samples}")
+    print(f"[OK] Number of classes: {len(train_generator.class_indices)}")
+    print(f"[OK] Labels saved to: {Config.LABELS_PATH}")
     
     # Compute class weights for imbalance
     class_counts = np.bincount(train_generator.classes)
@@ -105,7 +105,7 @@ def create_data_generators():
     )
     class_weights_dict = dict(enumerate(class_weights))
     
-    print("\n✓ Class weights computed for imbalanced dataset:")
+    print("\n[OK] Class weights computed for imbalanced dataset:")
     for cls_id, weight in sorted(class_weights_dict.items())[:5]:
         cls_name = labels_map[cls_id]
         print(f"  - {cls_name}: {weight:.2f} (samples: {class_counts[cls_id]})")
@@ -129,7 +129,7 @@ def build_model():
     
     # FREEZE backbone for fast training
     base_model.trainable = False
-    print("✓ EfficientNet-B0 backbone: FROZEN (feature extraction only)")
+    print("[OK] EfficientNet-B0 backbone: FROZEN (feature extraction only)")
     
     # Build classifier
     model = models.Sequential([
@@ -151,11 +151,11 @@ def build_model():
     trainable_params = sum([tf.size(w).numpy() for w in model.trainable_weights])
     total_params = model.count_params()
     
-    print(f"✓ Architecture: EfficientNet-B0 + Classification Head")
-    print(f"✓ Total parameters: {total_params:,}")
-    print(f"✓ Trainable parameters: {trainable_params:,}")
-    print(f"✓ Frozen parameters: {total_params - trainable_params:,}")
-    print(f"✓ Learning rate: {Config.LEARNING_RATE}")
+    print(f"[OK] Architecture: EfficientNet-B0 + Classification Head")
+    print(f"[OK] Total parameters: {total_params:,}")
+    print(f"[OK] Trainable parameters: {trainable_params:,}")
+    print(f"[OK] Frozen parameters: {total_params - trainable_params:,}")
+    print(f"[OK] Learning rate: {Config.LEARNING_RATE}")
     
     return model
 
@@ -214,9 +214,9 @@ def main():
     print("\n" + "="*70)
     print("STARTING TRAINING")
     print("="*70)
-    print(f"✓ Target epochs: {Config.EPOCHS}")
-    print(f"✓ Batch size: {Config.BATCH_SIZE}")
-    print(f"✓ Class weights: ENABLED")
+    print(f"[OK] Target epochs: {Config.EPOCHS}")
+    print(f"[OK] Batch size: {Config.BATCH_SIZE}")
+    print(f"[OK] Class weights: ENABLED")
     print("="*70 + "\n")
     
     history = model.fit(
@@ -229,7 +229,7 @@ def main():
     )
     
     # Load best model
-    print("\n✓ Loading best model...")
+    print("\n[OK] Loading best model...")
     model = keras.models.load_model(Config.MODEL_SAVE_PATH)
     
     # Final evaluation
@@ -238,8 +238,8 @@ def main():
     print("="*70)
     
     val_loss, val_accuracy = model.evaluate(val_gen, verbose=0)
-    print(f"✓ Validation Loss: {val_loss:.4f}")
-    print(f"✓ Validation Accuracy: {val_accuracy*100:.2f}%")
+    print(f"[OK] Validation Loss: {val_loss:.4f}")
+    print(f"[OK] Validation Accuracy: {val_accuracy*100:.2f}%")
     
     # Training complete
     end_time = datetime.now()
@@ -248,12 +248,12 @@ def main():
     print("\n" + "="*70)
     print(" "*20 + "TRAINING COMPLETED!")
     print("="*70)
-    print(f"✓ Model saved to: {Config.MODEL_SAVE_PATH}")
-    print(f"✓ Labels saved to: {Config.LABELS_PATH}")
-    print(f"✓ Training duration: {duration}")
-    print(f"✓ Best validation accuracy: {max(history.history['val_accuracy'])*100:.2f}%")
-    print(f"✓ Total classes: 17")
-    print("\n✓ Model is ready for production deployment!")
+    print(f"[OK] Model saved to: {Config.MODEL_SAVE_PATH}")
+    print(f"[OK] Labels saved to: {Config.LABELS_PATH}")
+    print(f"[OK] Training duration: {duration}")
+    print(f"[OK] Best validation accuracy: {max(history.history['val_accuracy'])*100:.2f}%")
+    print(f"[OK] Total classes: 17")
+    print("\n[OK] Model is ready for production deployment!")
     print("="*70 + "\n")
 
 

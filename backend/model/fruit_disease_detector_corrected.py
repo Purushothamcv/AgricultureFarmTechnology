@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fruit Disease Detection - CORRECTED Inference Module
 ====================================================
 BIOLOGICALLY CORRECT predictions using ONLY trained labels
@@ -98,9 +98,9 @@ class FruitDiseaseDetectorCorrected:
         # Then load model
         self._load_model()
         
-        logger.info("✅ FruitDiseaseDetectorCorrected initialized successfully")
-        logger.info(f"✅ Loaded {len(self.labels)} VALID disease labels")
-        logger.info(f"✅ Supported fruits: {sorted(self.VALID_FRUITS)}")
+        logger.info("[SUCCESS] FruitDiseaseDetectorCorrected initialized successfully")
+        logger.info(f"[SUCCESS] Loaded {len(self.labels)} VALID disease labels")
+        logger.info(f"[SUCCESS] Supported fruits: {sorted(self.VALID_FRUITS)}")
     
     def _load_and_validate_labels(self):
         """
@@ -128,7 +128,7 @@ class FruitDiseaseDetectorCorrected:
                 if fruit not in self.VALID_FRUITS:
                     logger.warning(f"Unknown fruit in label: {fruit} (from {label})")
             
-            logger.info(f"✓ Validated {len(self.labels)} class labels from {self.labels_path}")
+            logger.info(f"[OK] Validated {len(self.labels)} class labels from {self.labels_path}")
             
             # Log all labels for verification
             logger.info("Loaded labels:")
@@ -150,7 +150,7 @@ class FruitDiseaseDetectorCorrected:
             # Load model without compilation (faster for inference)
             self.model = load_model(self.model_path, compile=False)
             
-            logger.info("✓ Model loaded successfully")
+            logger.info("[OK] Model loaded successfully")
             logger.info(f"  Input shape: {self.model.input_shape}")
             logger.info(f"  Output shape: {self.model.output_shape}")
             
@@ -378,7 +378,7 @@ class FruitDiseaseDetectorCorrected:
                     is_ambiguous_healthy = True
                     potential_disease = second_pred["class"]
                     if debug:
-                        logger.warning(f"⚠️ Ambiguous Healthy: {potential_disease} has {second_pred['confidence']*100:.1f}% confidence")
+                        logger.warning(f"[WARN]️ Ambiguous Healthy: {potential_disease} has {second_pred['confidence']*100:.1f}% confidence")
             
             # Build result dictionary
             result = {
@@ -499,11 +499,11 @@ class FruitDiseaseDetectorCorrected:
         
         if is_uncertain:
             warnings.append(f"Low confidence ({confidence*100:.1f}%) - Prediction may be unreliable")
-            result["interpretation"] = f"⚠️ LOW CONFIDENCE - Consider uploading a clearer image"
+            result["interpretation"] = f"[WARN]️ LOW CONFIDENCE - Consider uploading a clearer image"
             result["action_required"] = "UPLOAD_BETTER_IMAGE"
         elif is_ambiguous_healthy:
             warnings.append(f"Healthy prediction is ambiguous - {result['potential_disease']} detected with {result['top_3'][1]['confidence']*100:.1f}% confidence")
-            result["interpretation"] = f"⚠️ AMBIGUOUS - Predicted Healthy but {disease} is possible"
+            result["interpretation"] = f"[WARN]️ AMBIGUOUS - Predicted Healthy but {disease} is possible"
             result["action_required"] = "EXPERT_VERIFICATION"
         elif confidence >= 0.90:
             result["interpretation"] = f"High confidence ({confidence*100:.1f}%) - Reliable prediction"
@@ -531,10 +531,10 @@ if __name__ == '__main__':
     try:
         # Initialize detector
         detector = FruitDiseaseDetectorCorrected()
-        print(f"\n✅ Detector initialized successfully")
-        print(f"✅ Model path: {detector.model_path}")
-        print(f"✅ Labels loaded: {len(detector.labels)}")
-        print(f"✅ Valid fruits: {sorted(detector.VALID_FRUITS)}")
+        print(f"\n[SUCCESS] Detector initialized successfully")
+        print(f"[SUCCESS] Model path: {detector.model_path}")
+        print(f"[SUCCESS] Labels loaded: {len(detector.labels)}")
+        print(f"[SUCCESS] Valid fruits: {sorted(detector.VALID_FRUITS)}")
         
         # Verify all labels
         print(f"\n📋 All Trained Labels:")
@@ -544,7 +544,7 @@ if __name__ == '__main__':
             disease = detector.extract_disease_from_label(label)
             print(f"  {idx:2d}. {label:45s} -> {fruit:12s} | {disease}")
         
-        print(f"\n✅ All labels validated - NO external diseases possible")
+        print(f"\n[SUCCESS] All labels validated - NO external diseases possible")
         print("="*70 + "\n")
         
     except Exception as e:

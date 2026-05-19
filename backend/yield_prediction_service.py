@@ -1,4 +1,4 @@
-"""
+﻿"""
 Yield Prediction Service
 Production-ready service for yield prediction using APY-trained model
 """
@@ -130,25 +130,25 @@ class YieldPredictionService:
             if not Path(self.model_path).exists():
                 raise FileNotFoundError(f"Model file not found: {self.model_path}")
             self.model = joblib.load(self.model_path)
-            print(f"  ✅ Model loaded from {self.model_path}")
+            print(f"  [SUCCESS] Model loaded from {self.model_path}")
             
             # Load encoders
             if not Path(self.encoders_path).exists():
                 raise FileNotFoundError(f"Encoders file not found: {self.encoders_path}")
             self.encoders = joblib.load(self.encoders_path)
-            print(f"  ✅ Encoders loaded: {list(self.encoders.keys())}")
+            print(f"  [SUCCESS] Encoders loaded: {list(self.encoders.keys())}")
             
             # Load feature info
             if Path(self.feature_info_path).exists():
                 with open(self.feature_info_path, 'r') as f:
                     self.feature_info = json.load(f)
-                print(f"  ✅ Feature info loaded")
+                print(f"  [SUCCESS] Feature info loaded")
             
             # Load metrics
             if Path(self.metrics_path).exists():
                 with open(self.metrics_path, 'r') as f:
                     self.metrics = json.load(f)
-                print(f"  ✅ Model metrics:")
+                print(f"  [SUCCESS] Model metrics:")
                 print(f"     - Type: {self.metrics.get('model_type', 'Unknown')}")
                 print(f"     - R² Score: {self.metrics.get('r2_score', 0):.4f}")
                 print(f"     - RMSE: {self.metrics.get('rmse', 0):.4f}")
@@ -157,15 +157,15 @@ class YieldPredictionService:
             # Load APY data at startup to avoid first-request latency.
             try:
                 self._load_apy_dataset()
-                print("  ✅ APY dataset loaded for state/crop filters")
+                print("  [SUCCESS] APY dataset loaded for state/crop filters")
             except FileNotFoundError:
-                print("  ⚠️ APY.csv not found; using encoder-based fallback for dropdown values")
+                print("  [WARN]️ APY.csv not found; using encoder-based fallback for dropdown values")
             except Exception as dataset_error:
-                print(f"  ⚠️ APY dataset could not be loaded: {dataset_error}")
-                print("  ⚠️ Continuing with encoder-based fallback for dropdown values")
+                print(f"  [WARN]️ APY dataset could not be loaded: {dataset_error}")
+                print("  [WARN]️ Continuing with encoder-based fallback for dropdown values")
             
             self.is_loaded = True
-            print(f"✅ Yield Prediction Service ready!")
+            print(f"[SUCCESS] Yield Prediction Service ready!")
             
         except Exception as e:
             print(f"❌ Failed to load yield prediction model: {e}")
@@ -210,7 +210,7 @@ class YieldPredictionService:
             )
             return sorted(districts)
         except Exception as e:
-            print(f"⚠️  Warning: Could not load districts for state {state}: {e}")
+            print(f"[WARN]️  Warning: Could not load districts for state {state}: {e}")
             # Fallback: return all districts
             district_encoder = self.encoders.get('District')
             if district_encoder is not None:
@@ -248,7 +248,7 @@ class YieldPredictionService:
             print(f"🌾 /yield/crops found: {len(crops_list)} crops")
             return crops_list
         except Exception as e:
-            print(f"⚠️  Warning: Could not load crops for state {state}: {e}")
+            print(f"[WARN]️  Warning: Could not load crops for state {state}: {e}")
             return []
     
     def validate_input(
@@ -510,7 +510,7 @@ def get_yield_service() -> YieldPredictionService:
         try:
             _yield_service.load_model()
         except Exception as e:
-            print(f"⚠️  Warning: Could not load yield model on startup: {e}")
+            print(f"[WARN]️  Warning: Could not load yield model on startup: {e}")
             print(f"   Model will be loaded on first prediction request")
     return _yield_service
 
@@ -522,9 +522,9 @@ async def startup_event():
     try:
         service = get_yield_service()
         if service.is_loaded:
-            print("✅ Yield Prediction Service initialized successfully")
+            print("[SUCCESS] Yield Prediction Service initialized successfully")
         else:
             service.load_model()
     except Exception as e:
-        print(f"⚠️  Yield Prediction Service initialization warning: {e}")
+        print(f"[WARN]️  Yield Prediction Service initialization warning: {e}")
         print(f"   Service will attempt to load model on first request")

@@ -1,4 +1,4 @@
-## File: model/model_training.py
+﻿## File: model/model_training.py
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
@@ -26,4 +26,4 @@ model.fit(X_train, y_train)
 
 # Save model
 joblib.dump(model, "model/yield_model.pkl")
-print("✅ Potato yield model trained and saved to model/yield_model.pkl")
+print("[SUCCESS] Potato yield model trained and saved to model/yield_model.pkl")

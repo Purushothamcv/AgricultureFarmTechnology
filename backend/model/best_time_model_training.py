@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -29,4 +29,4 @@ model.fit(X, y)
 # Save model
 os.makedirs("model", exist_ok=True)
 joblib.dump(model, "model/time_model.pkl")
-print("✅ Fertilizer timing model trained and saved.")
+print("[SUCCESS] Fertilizer timing model trained and saved.")

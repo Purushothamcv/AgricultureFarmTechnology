@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional, List
 import traceback
+from india_districts import INDIA_DISTRICTS, INDIA_STATES_AND_UTS, TOTAL_REGIONS, TOTAL_DISTRICTS
 
 logger = logging.getLogger(__name__)
 
@@ -32,28 +33,31 @@ def get_yield_service():
 
 
 # India states for yield prediction
-INDIA_STATES = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
-    "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
-    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
-    "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-    "Uttar Pradesh", "Uttarakhand", "West Bengal"
-]
+INDIA_STATES = INDIA_STATES_AND_UTS  # Use comprehensive list from india_districts.py
 
 
 @router.get("/states")
 async def get_states():
-    """Get list of Indian states for yield prediction"""
+    """
+    Get list of Indian states and union territories for yield prediction.
+    Returns all 28 states + 8 union territories = 36 regions total.
+    """
     try:
+        print(f"[REQUEST] GET /api/yield/states")
+        print(f"[OK] Returning {len(INDIA_STATES)} states and UTs ({TOTAL_REGIONS} total regions)")
+        
         return {
             "status": "success",
             "data": INDIA_STATES,
-            "total_states": len(INDIA_STATES)
+            "total_states": len([s for s in INDIA_STATES if s not in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"]]),
+            "total_uts": len([s for s in INDIA_STATES if s in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"]]),
+            "total_regions": TOTAL_REGIONS,
+            "total_districts_available": TOTAL_DISTRICTS
         }
     except Exception as e:
         logger.error(f"Error in get_states: {e}")
         traceback.print_exc()
+        print(f"[ERROR] Exception in get_states: {e}")
         return JSONResponse(
             status_code=500,
             content={"status": "error", "message": str(e)}
@@ -62,8 +66,14 @@ async def get_states():
 
 @router.get("/options")
 async def get_yield_options():
-    """Get available yield prediction parameters"""
+    """
+    Get available yield prediction parameters.
+    Includes comprehensive list of all states and union territories.
+    """
     try:
+        print(f"[REQUEST] GET /api/yield/options")
+        print(f"[OK] Returning yield prediction parameters with {TOTAL_REGIONS} regions")
+        
         return {
             "status": "success",
             "data": {
@@ -80,15 +90,115 @@ async def get_yield_options():
                     "Temperature (°C)",
                     "Humidity (%)",
                     "Soil pH"
-                ]
+                ],
+                "metadata": {
+                    "total_states": len([s for s in INDIA_STATES if s not in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"]]),
+                    "total_uts": len([s for s in INDIA_STATES if s in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"]]),
+                    "total_regions": TOTAL_REGIONS,
+                    "total_available_districts": TOTAL_DISTRICTS
+                }
             }
         }
     except Exception as e:
         logger.error(f"Error in get_yield_options: {e}")
         traceback.print_exc()
+        print(f"[ERROR] Exception in get_yield_options: {e}")
         return JSONResponse(
             status_code=500,
             content={"status": "error", "message": str(e)}
+        )
+
+
+@router.get("/districts/{state}")
+async def get_districts(state: str):
+    """
+    Get list of districts for a given Indian state or union territory.
+    Supports case-insensitive state names.
+    
+    Example:
+        - GET /api/yield/districts/Karnataka
+        - GET /api/yield/districts/karnataka
+        - GET /api/yield/districts/MAHARASHTRA
+    
+    Returns:
+        {
+            "status": "success",
+            "state": "Karnataka",
+            "districts": [list of district names],
+            "total_districts": count,
+            "region_type": "state"  # or "union_territory"
+        }
+    """
+    try:
+        print(f"[REQUEST] GET /api/yield/districts/{state}")
+        print(f"[INFO] Requested state/UT: {state}")
+        
+        # Try exact match first
+        if state in INDIA_DISTRICTS:
+            districts = INDIA_DISTRICTS[state]
+            region_type = "state" if state not in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"] else "union_territory"
+            print(f"[OK] Exact match found for state: {state}")
+            print(f"[OK] Returning {len(districts)} districts")
+            
+            return {
+                "status": "success",
+                "state": state,
+                "districts": districts,
+                "total_districts": len(districts),
+                "region_type": region_type
+            }
+        
+        # Try case-insensitive match
+        print(f"[INFO] Exact match not found, trying case-insensitive match...")
+        for region_name, districts in INDIA_DISTRICTS.items():
+            if region_name.lower() == state.lower():
+                region_type = "state" if region_name not in ["Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar Islands", "Lakshadweep", "Dadra and Nagar Haveli and Daman and Diu"] else "union_territory"
+                print(f"[OK] Case-insensitive match found: {region_name} (requested: {state})")
+                print(f"[OK] Returning {len(districts)} districts for {region_name}")
+                
+                return {
+                    "status": "success",
+                    "state": region_name,
+                    "districts": districts,
+                    "total_districts": len(districts),
+                    "region_type": region_type
+                }
+        
+        # State not found
+        print(f"[WARN] State/UT not found: {state}")
+        print(f"[INFO] Available states/UTs: {TOTAL_REGIONS} total regions ({len([s for s in INDIA_STATES_AND_UTS if s not in ['Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh', 'Andaman and Nicobar Islands', 'Lakshadweep', 'Dadra and Nagar Haveli and Daman and Diu']])} states, {len([s for s in INDIA_STATES_AND_UTS if s in ['Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh', 'Andaman and Nicobar Islands', 'Lakshadweep', 'Dadra and Nagar Haveli and Daman and Diu']])} UTs)")
+        
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "state": state,
+                "message": f"State/UT '{state}' not found",
+                "districts": [],
+                "total_districts": 0,
+                "error_details": {
+                    "total_supported_regions": TOTAL_REGIONS,
+                    "total_districts_available": TOTAL_DISTRICTS,
+                    "suggestion": "Check spelling or use one of the supported states/UTs"
+                }
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in get_districts: {e}")
+        traceback.print_exc()
+        print(f"[ERROR] Exception in get_districts: {e}")
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "state": state,
+                "message": "Internal server error while fetching districts",
+                "districts": [],
+                "total_districts": 0,
+                "error": str(e)
+            }
         )
 
 

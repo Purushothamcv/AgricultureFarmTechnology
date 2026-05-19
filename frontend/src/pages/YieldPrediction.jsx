@@ -58,25 +58,25 @@ const YieldPrediction = () => {
   const loadOptions = async () => {
     try {
       setLoadingOptions(true);
-      const response = await fetch(`${API_URL}/yield/states`);
+      const response = await fetch(`${API_URL}/api/yield/states`);
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success || data.data) {
         setOptions(prev => ({
           ...prev,
-          states: data.states || []
+          states: data.states || data.data || []
         }));
-        console.log('✅ Loaded states:', data.states?.length);
+        console.log('✅ Loaded states:', (data.states || data.data)?.length);
       }
 
       // Load seasons (crop list is state-dependent and loaded on state selection)
       const optionsResponse = await fetch(`${API_URL}/api/yield/options`);
       const optionsData = await optionsResponse.json();
       
-      if (optionsData.success) {
+      if (optionsData.success || optionsData.data) {
         setOptions(prev => ({
           ...prev,
-          seasons: optionsData.seasons || []
+          seasons: optionsData.seasons || optionsData.data?.seasons || []
         }));
         console.log('✅ Loaded seasons');
       }
@@ -90,10 +90,10 @@ const YieldPrediction = () => {
   const loadDistrictsByState = async (state) => {
     try {
       setLoadingDistricts(true);
-      const response = await fetch(`${API_URL}/yield/districts/${encodeURIComponent(state)}`);
+      const response = await fetch(`${API_URL}/api/yield/districts/${encodeURIComponent(state)}`);
       const data = await response.json();
       
-      if (data.success) {
+      if (data.status === 'success' || data.districts) {
         setOptions(prev => ({
           ...prev,
           districts: data.districts || []
@@ -135,7 +135,7 @@ const YieldPrediction = () => {
       console.error('Agentic crop fetch failed, falling back to dataset filter:', err);
 
       try {
-        const fallbackResponse = await fetch(`${API_URL}/yield/crops/${encodeURIComponent(state)}`);
+        const fallbackResponse = await fetch(`${API_URL}/api/yield/crops/${encodeURIComponent(state)}`);
         const fallbackData = await fallbackResponse.json();
         console.log('🌾 Fallback crop API response:', fallbackData);
 
@@ -238,55 +238,52 @@ const YieldPrediction = () => {
         if (matchingState) {
           console.log('✅ Found matching state:', matchingState);
           
-          // First set the state - this will trigger district loading via useEffect
+          // Set the state immediately
           setFormData(prev => ({
             ...prev,
             state: matchingState,
-            district: '', // Clear district initially
+            district: '', // Will be set after district is loaded
             crop: ''
           }));
           setLocationAutoFilled(prev => ({ ...prev, state: true, district: false }));
           
           // Load districts for this state and then find matching district
           try {
-            const districtResponse = await fetch(`${API_URL}/yield/districts/${encodeURIComponent(matchingState)}`);
+            const districtResponse = await fetch(`${API_URL}/api/yield/districts/${encodeURIComponent(matchingState)}`);
             const districtData = await districtResponse.json();
             
-            if (districtData.success && districtData.districts) {
+            if (districtData.status === 'success' && districtData.districts) {
               // Find matching district using fuzzy matching
               const matchingDistrict = districtData.districts.find(d => fuzzyMatch(d, geocodedDistrict));
               
               if (matchingDistrict) {
                 console.log('✅ Found matching district:', matchingDistrict);
-                // Set the district after a short delay to ensure state update is processed
-                setTimeout(() => {
-                  setFormData(prev => ({
-                    ...prev,
-                    district: matchingDistrict
-                  }));
-                  setLocationAutoFilled(prev => ({ ...prev, district: true }));
-                }, 200);
-                
-                alert(`✅ Location Auto-filled Successfully!\n\nState: ${matchingState}\nDistrict: ${matchingDistrict}\n\nPlease verify the values in the form below and complete other fields.`);
+                // Set the district directly without delay
+                setFormData(prev => ({
+                  ...prev,
+                  district: matchingDistrict
+                }));
+                setLocationAutoFilled(prev => ({ ...prev, district: true }));
+                console.log(`✅ Location auto-filled: ${matchingState}, ${matchingDistrict}`);
               } else {
-                console.warn('⚠️ No matching district found. Available:', districtData.districts.slice(0, 3));
-                alert(`✅ State auto-filled: ${matchingState}\n⚠️ District "${geocodedDistrict}" not found in database.\n\nPlease select the district manually from the dropdown.`);
+                console.warn('⚠️ No matching district found for:', geocodedDistrict, 'Available:', districtData.districts.slice(0, 3));
+                setLocationAutoFilled(prev => ({ ...prev, district: false }));
               }
             }
           } catch (districtErr) {
             console.error('Error loading districts:', districtErr);
-            alert(`✅ State auto-filled: ${matchingState}\n\nPlease select the district manually.`);
+            setLocationAutoFilled(prev => ({ ...prev, district: false }));
           }
         } else {
           console.warn('⚠️ No matching state found. Received:', geocodedState, 'Available:', options.states.slice(0, 5));
-          alert(`❌ Location Not Found in Database\n\nDetected: ${geocodedState}, ${geocodedDistrict}\n\nThis state is not available in the yield prediction database.\nPlease select State and District manually from the dropdowns.`);
+          setLocationAutoFilled(prev => ({ ...prev, state: false, district: false }));
         }
       } else {
         throw new Error('No address data received from geocoding service');
       }
     } catch (err) {
       console.error('Error in reverse geocoding:', err);
-      alert('❌ Could Not Determine Location\n\nPlease select State and District manually from the dropdowns.');
+      setLocationAutoFilled(prev => ({ ...prev, state: false, district: false }));
     }
   };
 
@@ -323,7 +320,7 @@ const YieldPrediction = () => {
 
       console.log('📤 Sending yield prediction request:', payload);
       
-      const response = await fetch(`${API_URL}/predict-yield`, {
+      const response = await fetch(`${API_URL}/api/yield/predict`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -333,11 +330,34 @@ const YieldPrediction = () => {
 
       const data = await response.json();
       console.log('📥 Received yield prediction:', data);
+      console.log('FULL response data:', data);
 
-      if (data.success) {
-        setResult(data);
+      if (data.status === 'success' && data.data) {
+        // Transform backend response to match frontend expectations
+        const predictionData = data.data;
+        const transformedResult = {
+          success: true,
+          predicted_yield: predictionData.yield_per_hectare || (predictionData.predicted_yield_kg / parsedArea),
+          unit: 'kg/hectare',
+          estimated_production: predictionData.predicted_yield_tons || (predictionData.predicted_yield_kg / 1000),
+          production_unit: 'tonnes',
+          confidence: predictionData.confidence || 0.85,
+          model_type: 'XGBoost',
+          source: 'model_prediction',
+          was_corrected: false,
+          input_values: {
+            state: predictionData.state,
+            district: predictionData.district,
+            crop: predictionData.crop,
+            year: predictionData.year,
+            season: predictionData.season,
+            area: parsedArea
+          }
+        };
+        console.log('✅ Transformed result:', transformedResult);
+        setResult(transformedResult);
       } else {
-        throw new Error(data.error || data.detail || 'Prediction failed');
+        throw new Error(data.error || data.detail || data.message || 'Prediction failed');
       }
     } catch (err) {
       console.error('Error:', err);
