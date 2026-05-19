@@ -1,263 +1,214 @@
-# 🌾 SmartAgri-AI: Intelligent Agricultural Management System
+# SmartAgri-AI Minimal GitHub Package
 
-## 📋 Overview
+This repo should contain only the files needed to clone, install, and run the current FastAPI + React app.
 
-A full-stack AI-powered agricultural platform built with FastAPI and React. Features ML-based crop recommendations, disease detection, yield prediction, and real-time weather integration with interactive maps. Helps farmers make data-driven decisions for optimal farming practices.
+## 1) Keep in GitHub
 
-**Tech Stack**: Python | FastAPI | React | MongoDB | Scikit-learn | TensorFlow | Leaflet.js
+### Root files
+- `.gitignore`
+- `.env.example`
+- `docker-compose.yml`
+- `readme.md`
 
----
+### Backend runtime files
+- `backend/main_fastapi.py`
+- `backend/auth.py`
+- `backend/database.py`
+- `backend/weather_location.py`
+- `backend/chatbot_service.py`
+- `backend/crop_service.py`
+- `backend/crop_models.py`
+- `backend/api_crop_prediction.py`
+- `backend/api_fertilizer.py`
+- `backend/fertilizer_prediction_service.py`
+- `backend/api_stress.py`
+- `backend/stress_prediction_service.py`
+- `backend/api_fruit_disease_production.py`
+- `backend/fruit_disease_api_v2.py`
+- `backend/fruit_disease_service.py`
+- `backend/plant_disease_service.py`
+- `backend/yield_prediction_service.py`
+- `backend/model_manager.py`
+- `backend/logging_config.py`
+- `backend/requirements.txt`
+- `backend/.env.example`
 
-## ✨ Key Features
+### Backend runtime data / model artifacts
+Keep only the files the code actually loads at runtime:
+- `backend/model/crop_model.pkl`
+- `backend/model/fertilizer_model.pkl`
+- `backend/model/fertilizer_encoders.pkl`
+- `backend/model/fertilizer_label_encoder.pkl`
+- `backend/model/fertilizer_feature_info.json`
+- `backend/model/fertilizer_model_metrics.json`
+- `backend/model/yield_prediction_model.pkl`
+- `backend/model/yield_encoders.pkl`
+- `backend/model/yield_feature_info.json`
+- `backend/model/yield_model_metrics.json`
+- `backend/model/stress_prediction_model.pkl`
+- `backend/model/stress_label_encoders.pkl`
+- `backend/model/stress_features.pkl`
+- `backend/model/fruit_disease_model.h5`
+- `backend/model/fruit_disease_labels.json`
+- `backend/model/plant_disease_prediction_model.h5`
 
-### 🌍 **Interactive Location-Based Dashboard**
-- **Interactive Leaflet.js Maps**: Click-to-select location on map or search by city name
-- **Geolocation Support**: "Use My Location" button for instant GPS-based positioning
-- **Real-time Weather Integration**: Automatic weather data fetching from Open-Meteo API
-- **Smart Search**: Nominatim API integration for global location search
-- **Weather Auto-fill**: Weather data automatically propagates across all modules
+### Frontend runtime files
+- `frontend/index.html`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/vite.config.js`
+- `frontend/tailwind.config.js`
+- `frontend/postcss.config.js`
+- `frontend/eslint.config.js`
+- `frontend/.env.example`
+- `frontend/src/**`
+- `frontend/public/auth-test.html` if you want the auth test page
 
-### 🌱 **Crop Recommendation System**
-- **Dual Input Modes**:
-  - **Manual Entry**: Input soil nutrients (N, P, K), pH, and environmental data
-  - **Map-Based Selection**: Select location on map for automatic weather/soil data retrieval
-- **8-Feature ML Model**: Random Forest Classifier trained on soil and climate parameters
-- **Regional Soil Data**: Pre-configured soil profiles for different Indian regions
-- **Instant Predictions**: Get crop recommendations optimized for your conditions
-- **Parameters**: Nitrogen, Phosphorus, Potassium, Temperature, Humidity, pH, Rainfall, Ozone
+## 2) Delete before pushing
 
-### 🥔 **Potato Disease Prediction (LSTM)**
-- **Time-Series Analysis**: LSTM neural network for disease outbreak prediction
-- **Historical Data Processing**: Analyzes patterns in environmental conditions
-- **Disease Risk Assessment**: Early warning system for potential disease outbreaks
-- **Field-Specific Predictions**: Multi-field support with individual tracking
+These should stay out of the repo to keep it small:
+- `.env`
+- `backend/.env`
+- `frontend/.env`
+- `frontend/.env.local`
+- `frontend/.env.production`
+- `node_modules/`
+- `frontend/node_modules/`
+- `dist/`
+- `frontend/dist/`
+- `build/`
+- `venv/`, `.venv/`, `env/`, `ENV/`
+- `__pycache__/`, `backend/__pycache__/`, `frontend/__pycache__/`
+- `*.pyc`, `*.pyo`, `*.pyd`
+- `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `.cache/`
+- `backend/data/archive/`
+- `backend/data/*.csv`
+- `backend/data/*.tsv`
+- `backend/data/*.xlsx`
+- `backend/evaluation_graphs/`
+- `backend/model/*history*`
+- `backend/model/*report*`
+- `backend/model/*visualization*`
+- `backend/model/*.png`
+- `backend/model/*.log`
+- `backend/model/*.tmp`
+- `backend/model/*.temp`
+- training-only scripts, backups, and one-off utilities that are not imported by `main_fastapi.py`
 
-### 🍃 **Leaf Disease Detection**
-- **Image-Based Diagnosis**: Upload plant leaf images for disease identification
-- **Deep Learning Classification**: CNN model for accurate disease detection
-- **Instant Results**: Real-time analysis with disease type and confidence score
-- **Treatment Recommendations**: Actionable advice for disease management
+## 3) Final optimized folder structure
 
-### 🍎 **Fruit Disease Detection**
-- **Multi-Fruit Support**: Detects diseases across various fruit crops
-- **Visual Analysis**: Image upload and processing for fruit disease identification
-- **Disease Database**: Comprehensive collection of fruit disease signatures
-- **Prevention Guidelines**: Suggestions for disease prevention and control
-
-### 📊 **Yield Prediction**
-- **Crop-Specific Models**: Predictive analytics for different crop types
-- **Environmental Factors**: Considers temperature, rainfall, humidity, soil moisture
-- **Area-Based Calculations**: Estimates total yield based on cultivated area
-- **Ozone Impact Analysis**: Accounts for atmospheric ozone effects on crop growth
-
-### 💧 **Fertilizer Recommendation**
-- **Nutrient Analysis**: NPK (Nitrogen, Phosphorus, Potassium) requirement calculation
-- **Soil-Based Recommendations**: Tailored fertilizer suggestions based on soil type
-- **Crop-Specific Guidance**: Different recommendations for different crops
-- **Quantity Estimation**: Precise fertilizer amount calculations
-
-### ⚠️ **Plant Stress Prediction**
-- **Multi-Factor Analysis**: Evaluates stress from temperature, water, nutrients
-- **Stress Level Classification**: Categorizes stress as Low, Moderate, High, or Critical
-- **Early Warning System**: Alerts farmers to potential crop stress conditions
-- **Preventive Measures**: Recommendations to mitigate identified stress factors
-
-### 🌤️ **Best Spray Time Calculator**
-- **Weather-Based Analysis**: Determines optimal pesticide/herbicide application timing
-- **Three Input Methods**:
-  1. Use Current Weather (GPS-based)
-  2. Auto-fill from Dashboard weather data
-  3. Manual weather forecast entry
-- **Safety Assessment**: Evaluates wind speed, temperature, humidity, rainfall
-- **Time Slot Recommendations**: Suggests best times (early morning, evening, etc.)
-- **Risk Factors Display**: Highlights favorable and unfavorable conditions
-
-### 🤖 **AI Agricultural Chatbot**
-- **Natural Language Processing**: Conversational interface for agricultural queries
-- **Context-Aware Responses**: Provides relevant information about modules and farming
-- **Module Integration**: Explains features and guides users through the platform
-- **24/7 Assistance**: Always available for farming-related questions
-
-### 🔐 **User Authentication System**
-- **MongoDB Integration**: Secure user data storage in "FinalProject" database
-- **Bcrypt Password Hashing**: Industry-standard password encryption (12 rounds)
-- **Session Management**: Persistent login with localStorage
-- **Protected Routes**: Role-based access control for authenticated users
-- **Registration & Login**: Complete authentication workflow
-
----
-
-## 🛠️ Technology Stack
-
-### **Backend**
-- **FastAPI**: Modern, fast Python web framework with automatic API documentation
-- **Python 3.10**: Core programming language
-- **MongoDB**: NoSQL database for user management and logging (Motor async driver)
-- **Scikit-learn 1.7.2**: Machine Learning models (Random Forest, Decision Trees)
-- **TensorFlow/Keras**: Deep learning for LSTM and CNN models
-- **Joblib**: Model serialization and loading
-- **Passlib**: Password hashing with bcrypt
-- **Requests**: HTTP client for external API calls
-- **Uvicorn**: ASGI server with hot-reload support
-
-### **Frontend**
-- **React 18**: Modern UI library with hooks
-- **React Router v6**: Client-side routing with protected routes
-- **Vite**: Lightning-fast build tool and dev server
-- **Tailwind CSS**: Utility-first CSS framework for styling
-- **Lucide React**: Beautiful icon library
-- **Axios**: Promise-based HTTP client
-- **Leaflet.js 1.9.4**: Interactive map library
-- **React-Leaflet**: React components for Leaflet integration
-
-### **External APIs**
-- **Open-Meteo API**: Free weather data (no API key required)
-  - Temperature, humidity, precipitation
-  - Wind speed and atmospheric conditions
-- **Nominatim API (OpenStreetMap)**: Geocoding and location search
-  - Forward geocoding (city → coordinates)
-  - Reverse geocoding (coordinates → address)
-
-### **Machine Learning Models**
-- **Crop Recommendation**: Random Forest Classifier (8 features)
-- **Disease Detection**: Convolutional Neural Networks (CNN)
-- **Yield Prediction**: Regression models
-- **Potato Disease LSTM**: Time-series prediction with LSTM networks
-- **Stress Prediction**: Multi-factor classification models
-
----
-
-## 📁 Project Structure
-
-```
+```text
 SmartAgri-AI/
-│
-├── frontend/                      # React Frontend Application
-│   ├── src/
-│   │   ├── components/           # Reusable UI Components
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── WeatherCard.jsx
-│   │   │   ├── InputField.jsx
-│   │   │   ├── LoadingSpinner.jsx
-│   │   │   ├── ResultCard.jsx
-│   │   │   ├── ChatMessage.jsx
-│   │   │   ├── ImageUploader.jsx
-│   │   │   └── ProtectedRoute.jsx
-│   │   │
-│   │   ├── pages/                # Page Components
-│   │   │   ├── Dashboard.jsx     # Main dashboard with map
-│   │   │   ├── Login.jsx
-│   │   │   ├── Register.jsx
-│   │   │   ├── CropRecommendation.jsx
-│   │   │   ├── YieldPrediction.jsx
-│   │   │   ├── FertilizerRecommendation.jsx
-│   │   │   ├── StressPrediction.jsx
-│   │   │   ├── BestSprayTime.jsx
-│   │   │   ├── LeafDisease.jsx
-│   │   │   ├── FruitDisease.jsx
-│   │   │   └── Chatbot.jsx
-│   │   │
-│   │   ├── services/             # API Integration
-│   │   │   ├── api.js            # Axios instance
-│   │   │   └── services.js       # Service functions
-│   │   │
-│   │   ├── context/              # React Context
-│   │   │   └── AuthContext.jsx   # Authentication state
-│   │   │
-│   │   ├── App.jsx               # Root component with routes
-│   │   ├── main.jsx              # Entry point
-│   │   └── index.css             # Global styles
-│   │
-│   ├── public/                   # Static assets
-│   ├── package.json              # Dependencies
-│   ├── vite.config.js            # Vite configuration
-│   ├── tailwind.config.js        # Tailwind CSS config
-│   └── postcss.config.js         # PostCSS config
-│
-├── actual/                        # Potato Disease Module
-│   ├── model/
-│   │   ├── potato_disease_lstm_model.h5
-│   │   └── LSTM_timeSeries.py
-│   ├── data/
-│   │   ├── combined_potato_disease_data.csv
-│   │   └── fields.json
-│   ├── app.py                    # Flask app for potato disease
-│   ├── main.py
-│   └── train.py
-│
-├── model/                         # ML Model Training Scripts
-│   ├── model_training.py         # Crop recommendation model
-│   ├── train_crop_model.py
-│   ├── fertilizer_model_training.py
-│   ├── best_time_model_training.py
-│   └── predict_stress_level.py
-│
-├── data/                          # Training Datasets
-│   ├── crop.csv                  # Crop training data
-│   ├── fertilizer.csv            # Fertilizer data
-│   └── sample_data.py
-│
-├── static/                        # Frontend Static Files
-│   ├── css/
-│   │   └── style.css
-│   ├── js/
-│   │   ├── app.js
-│   │   ├── dashboard.js
-│   │   └── auto_update.js
-│   └── leaflet.js
-│
-├── templates/                     # HTML Templates
+├── backend/
+│   ├── main_fastapi.py
+│   ├── auth.py
+│   ├── database.py
+│   ├── chatbot_service.py
+│   ├── crop_service.py
+│   ├── crop_models.py
+│   ├── api_crop_prediction.py
+│   ├── api_fertilizer.py
+│   ├── fertilizer_prediction_service.py
+│   ├── api_stress.py
+│   ├── stress_prediction_service.py
+│   ├── api_fruit_disease_production.py
+│   ├── fruit_disease_api_v2.py
+│   ├── fruit_disease_service.py
+│   ├── plant_disease_service.py
+│   ├── yield_prediction_service.py
+│   ├── weather_location.py
+│   ├── model_manager.py
+│   ├── logging_config.py
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── model/
+│       ├── crop_model.pkl
+│       ├── fertilizer_model.pkl
+│       ├── fertilizer_encoders.pkl
+│       ├── fertilizer_label_encoder.pkl
+│       ├── fertilizer_feature_info.json
+│       ├── fertilizer_model_metrics.json
+│       ├── yield_prediction_model.pkl
+│       ├── yield_encoders.pkl
+│       ├── yield_feature_info.json
+│       ├── yield_model_metrics.json
+│       ├── stress_prediction_model.pkl
+│       ├── stress_label_encoders.pkl
+│       ├── stress_features.pkl
+│       ├── fruit_disease_model.h5
+│       ├── fruit_disease_labels.json
+│       └── plant_disease_prediction_model.h5
+├── frontend/
 │   ├── index.html
-│   ├── weather.html
-│   └── crop_recommendation.html
-│
-├── main_fastapi.py               # Main FastAPI Application
-├── crop_service.py               # Crop prediction service
-├── crop_models.py                # Pydantic models
-├── utils.py                      # Utility functions
-├── weather_fastapi.py            # Weather service
-├── requirements.txt              # Python dependencies
-├── crop_model.pkl                # Trained ML model
-└── README.md                     # This file
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── eslint.config.js
+│   ├── .env.example
+│   ├── public/
+│   └── src/
+└── docker-compose.yml
 ```
 
----
+## 4) Environment variables to store in `.env`
 
-## 🚀 Installation & Setup
+### Backend `.env`
+- `MONGODB_URL`
+- `DATABASE_NAME`
+- `USERS_DATABASE`
+- `CHATBOT_DATABASE`
+- `LEGACY_DATABASE`
+- `GROQ_API_KEY`
+- `JWT_SECRET_KEY`
+- `JWT_ALGORITHM`
+- `JWT_EXPIRATION_MINUTES`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `OPENWEATHER_API_KEY`
+- `NEWSAPI_KEY`
+- `PORT`
+- `HOST`
+- `CORS_ORIGINS`
+- `ENVIRONMENT`
+- `LOW_MEMORY_MODE`
 
-### Prerequisites
-- **Python 3.10+**
-- **Node.js 16+** and **npm**
-- **MongoDB** (local or MongoDB Atlas)
-- **Git**
+### Frontend `.env`
+- `VITE_API_BASE_URL` or `VITE_BACKEND_URL`
+- `VITE_GOOGLE_CLIENT_ID`
 
-### Backend Setup
+## 5) Clone and run after pushing
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/SmartAgri-AI.git
-   cd SmartAgri-AI
-   ```
+```powershell
+git clone https://github.com/Purushothamcv/AgricultureFarmTechnology.git
+cd AgricultureFarmTechnology
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env
 
-3. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main_fastapi:app --host 127.0.0.1 --port 8000
 
-4. **Start MongoDB**
-   ```bash
-   # Local MongoDB
-   mongod --dbpath /path/to/data/db
-   
-   # Or use MongoDB Atlas (cloud)
-   # Update connection string in main_fastapi.py
-   ```
+cd ..\frontend
+npm install
+npm run dev
+```
+
+If you run from the repo root, use:
+
+```powershell
+pip install -r backend\requirements.txt
+cd frontend
+npm install
+```
+
+## 6) Notes
+
+- Keep trained ML model files only if the corresponding endpoint is used at runtime.
+- Do not commit `.env`, `node_modules`, `venv`, cache folders, or generated build output.
+- If you want the repo even smaller, remove training scripts and legacy backups that are not imported by `main_fastapi.py`.
 
 5. **Run the FastAPI server**
    ```bash
